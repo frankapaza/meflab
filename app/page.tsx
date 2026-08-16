@@ -1,69 +1,91 @@
-import Image from "next/image";
+import { salir } from "@/app/(auth)/login/acciones";
+import { crearClienteServidor } from "@/lib/supabase/server";
 
-export default function Home() {
+/**
+ * Inicio provisional. Existe para verificar de extremo a extremo que la
+ * sesión llega al servidor con sus claims. El layout real es el
+ * entregable 0.7.
+ */
+export default async function Inicio() {
+  const supabase = await crearClienteServidor();
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+
+  const roles = Array.isArray(claims?.roles) ? (claims.roles as string[]) : [];
+
+  // Lee a través de RLS: sólo devuelve el laboratorio del propio usuario.
+  const { data: lab } = await supabase.from("tenant").select("nombre").single();
+  const { data: estados } = await supabase
+    .from("estado_trabajo")
+    .select("glifo, nombre")
+    .order("orden");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="mx-auto flex max-w-[720px] flex-col gap-s5 p-s6">
+      <header className="flex flex-wrap items-center gap-s3">
+        <div>
+          <p className="font-mono text-1 uppercase tracking-wide text-ink-3">
+            {lab?.nombre ?? "sin laboratorio"}
           </p>
+          <h1 className="text-6 font-semibold tracking-tight">Sesión iniciada</h1>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex-1" />
+        <form action={salir}>
+          <button className="h-tap rounded-r1 border border-line bg-card px-s3 font-mono text-1 text-ink-2 hover:bg-fill">
+            SALIR
+          </button>
+        </form>
+      </header>
+
+      <section className="flex flex-col gap-s3 rounded-r2 border border-line bg-card p-s4 shadow-e1">
+        <h2 className="font-mono text-1 uppercase tracking-wide text-ink-3">
+          Lo que dice tu token
+        </h2>
+        <dl className="flex flex-col gap-s2 text-3">
+          <div className="flex justify-between gap-s3 border-b border-line pb-s2">
+            <dt className="text-ink-2">Correo</dt>
+            <dd className="num">{String(claims?.email ?? "—")}</dd>
+          </div>
+          <div className="flex justify-between gap-s3 border-b border-line pb-s2">
+            <dt className="text-ink-2">Laboratorio</dt>
+            <dd className="num text-2">{String(claims?.tenant_id ?? "—")}</dd>
+          </div>
+          <div className="flex justify-between gap-s3">
+            <dt className="text-ink-2">Roles</dt>
+            <dd className="flex flex-wrap gap-s1">
+              {roles.map((r) => (
+                <span
+                  key={r}
+                  className="rounded-r1 bg-acc-bg px-s2 py-[3px] font-mono text-1 font-semibold text-acc"
+                >
+                  {r}
+                </span>
+              ))}
+            </dd>
+          </div>
+        </dl>
+        <p className="text-2 leading-relaxed text-ink-2">
+          Los permisos son la <b className="font-semibold text-ink">unión</b> de
+          todos tus roles. Ningún rol compuesto, ninguna excepción en el código.
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-s3 rounded-r2 border border-line bg-card p-s4 shadow-e1">
+        <h2 className="font-mono text-1 uppercase tracking-wide text-ink-3">
+          Leído a través de RLS · {estados?.length ?? 0} estados
+        </h2>
+        <div className="flex flex-wrap gap-s2">
+          {estados?.map((e) => (
+            <span
+              key={e.nombre}
+              className="inline-flex items-center gap-s2 rounded-r1 bg-fill px-s3 py-s1 text-1 text-ink-2"
+            >
+              <span className="font-mono">{e.glifo}</span>
+              {e.nombre}
+            </span>
+          ))}
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

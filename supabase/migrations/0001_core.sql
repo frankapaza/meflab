@@ -92,6 +92,10 @@ $$;
 comment on function public.areas_del_usuario is
   'Área principal del usuario más aquellas en las que puede apoyar (AC-01 §3.2.5).';
 
+-- ── 2.1 · HOOK DEL TOKEN ──────────────────────────────────────────────
+-- Se define al final del archivo, cuando ya existen usuario y usuario_rol.
+-- Ver sección 8.
+
 -- ── 3 · TABLAS ────────────────────────────────────────────────────────
 
 create table public.tenant (
@@ -474,3 +478,80 @@ begin
   end loop;
 end;
 $$;
+
+-- ── 8 · HOOK DEL ACCESS TOKEN ─────────────────────────────────────────
+-- Mete tenant_id, roles[] y areas[] en el JWT. Sin esto todas las
+-- políticas fallan cerradas y el usuario no ve absolutamente nada.
+--
+-- El claim es `roles` (array), NO `rol`: un usuario tiene varios roles
+-- (AC-01 §7.2) y sus permisos son la unión. Un claim escalar obligaría a
+-- inventar roles compuestos, que es justo lo que el análisis descarta.
+create or replace function public.custom_access_token_hook(event jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  claims jsonb;
+  u      record;
+  v_roles text[];
+  v_areas text[];
+begin
+  select tenant_id, sede_id, area_id, activo
+    into u
+    from public.usuario
+   where id = (event ->> 'user_id')::uuid;
+
+  claims := event -> 'claims';
+
+  -- Un usuario desactivado sale con un token sin tenant: las políticas
+  -- fallan cerradas y no ve nada, sin necesidad de borrarle la cuenta.
+  if u.tenant_id is null or not u.activo then
+    return jsonb_set(event, '{claims}', claims);
+  end if;
+
+  select array_agg(rol::text order by rol)
+    into v_roles
+    from public.usuario_rol
+   where usuario_id = (event ->> 'user_id')::uuid;
+
+  -- Área principal más aquellas en las que puede apoyar.
+  select array_agg(distinct x)
+    into v_areas
+    from (
+      select u.area_id::text as x
+      union
+      select area_id::text
+        from public.usuario_area_apoyo
+       where usuario_id = (event ->> 'user_id')::uuid
+    ) s
+   where x is not null;
+
+  claims := jsonb_set(claims, '{tenant_id}', to_jsonb(u.tenant_id::text));
+  claims := jsonb_set(claims, '{roles}',     to_jsonb(coalesce(v_roles, '{}'::text[])));
+  claims := jsonb_set(claims, '{areas}',     to_jsonb(coalesce(v_areas, '{}'::text[])));
+  claims := jsonb_set(claims, '{sede_id}',   to_jsonb(coalesce(u.sede_id::text, '')));
+
+  return jsonb_set(event, '{claims}', claims);
+end;
+$$;
+
+comment on function public.custom_access_token_hook is
+  'Emite tenant_id, roles[] y areas[] en el JWT. Un usuario inactivo sale sin tenant y no ve nada.';
+
+-- Supabase Auth ejecuta el hook con su propio rol, no con el del usuario.
+grant usage on schema public to supabase_auth_admin;
+grant execute on function public.custom_access_token_hook to supabase_auth_admin;
+grant select on public.usuario, public.usuario_rol, public.usuario_area_apoyo
+  to supabase_auth_admin;
+
+-- Auth no pasa por RLS al leer estas tres tablas: es el propio emisor del
+-- token, y si RLS lo filtrara no podría construir los claims.
+create policy usuario_auth_admin on public.usuario
+  for select to supabase_auth_admin using (true);
+create policy usuario_rol_auth_admin on public.usuario_rol
+  for select to supabase_auth_admin using (true);
+create policy usuario_area_apoyo_auth_admin on public.usuario_area_apoyo
+  for select to supabase_auth_admin using (true);
