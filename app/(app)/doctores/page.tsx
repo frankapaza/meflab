@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { contextoActual } from "@/lib/auth/permisos";
@@ -149,7 +150,12 @@ export default async function DoctoresPage() {
                     >
                       <td className="px-pad-x py-s3">
                         <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-base font-medium">{d.nombre}</span>
+                          <Link
+                            href={`/doctores/${d.id}`}
+                            className="truncate text-base font-medium hover:text-acc"
+                          >
+                            {d.nombre}
+                          </Link>
                           <span className="truncate font-mono text-xs text-ink-3">
                             {d.colegiatura ?? "sin colegiatura"}
                             {d.sede_entrega ? ` · entrega en ${d.sede_entrega}` : ""}
@@ -228,11 +234,9 @@ export default async function DoctoresPage() {
         )}
       </div>
 
-      {/* La ficha 360° del doctor —su historial, sus trabajos, sus reclamos—
-          es la historia 18. Necesita órdenes que enseñar, y las órdenes son
-          la historia 5. Enlazar ahora a una pantalla vacía sería peor. */}
       <p className="text-sm text-ink-3">
-        La ficha 360° de cada doctor llega cuando existan órdenes que enseñar.
+        Pulsa el nombre de un doctor para ver su ficha 360°: sus trabajos en
+        curso, su historial y su puntualidad de entrega.
       </p>
     </div>
   );

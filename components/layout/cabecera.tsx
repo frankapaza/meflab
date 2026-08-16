@@ -1,5 +1,6 @@
 "use client";
 
+import { Buscador } from "@/components/layout/buscador";
 import { useTema, type Densidad } from "@/components/tema";
 import { salir } from "@/app/(auth)/login/acciones";
 import { cn } from "@/lib/utils";
@@ -45,18 +46,7 @@ export function Cabecera({
 
       {/* Buscador global: el requisito de Recepción es responder "¿cómo va
           mi trabajo?" en menos de 10 segundos, desde cualquier pantalla. */}
-      <button
-        className="flex h-[34px] min-w-[180px] max-w-[440px] flex-1 items-center gap-s2 rounded-r2 border border-line bg-card-2 px-s3 text-sm text-ink-3 transition hover:border-line-2 hover:bg-card"
-        aria-label="Buscar orden, doctor o paciente"
-      >
-        <span className="size-[13px] shrink-0 rounded-full border-[1.5px] border-current opacity-80" />
-        <span className="flex-1 truncate text-left">
-          Buscar orden, doctor o paciente…
-        </span>
-        <kbd className="shrink-0 rounded-r1 border border-line bg-card px-s2 py-[2px] font-mono text-[10px]">
-          ⌘K
-        </kbd>
-      </button>
+      <Buscador />
 
       <div className="flex items-center gap-s2">
         <button
