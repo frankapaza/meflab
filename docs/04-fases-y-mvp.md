@@ -77,10 +77,10 @@ Sin pantallas de negocio. Es la base sobre la que todo lo demás se apoya.
 
 | # | Entregable |
 |---|---|
-| 0.1 | Repositorio, Next.js 15, Tailwind v4, shadcn/ui, CI en Vercel |
+| 0.1 | Repositorio, **Next.js 16**, Tailwind v4, shadcn/ui, CI en Vercel |
 | 0.2 | Proyectos Supabase dev y prod; migraciones `0001`‑`0004` aplicadas |
 | 0.3 | Auth: login, recuperación de contraseña, custom claims (`tenant_id`, **roles[]**, `area_id`) |
-| 0.4 | Middleware de sesión y guardas de ruta por **conjunto** de roles |
+| 0.4 | **`proxy.ts`** de sesión y guardas de ruta por **conjunto** de roles *(en Next 16 el middleware se llama proxy y corre en nodejs)* |
 | 0.5 | **Tokens del sistema de diseño en Tailwind v4**: color claro/oscuro, tipografía, espaciado, radios, elevación, 3 densidades |
 | 0.6 | **Primitivos de shadcn tematizados** con los tokens: botón, campo, tabla, badge, modal, chip, medidor |
 | 0.7 | **Layout**: barra lateral por rol, cabecera, buscador global, conmutador de tema y densidad, responsive |

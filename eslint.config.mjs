@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // El prototipo no es código del proyecto: `support.js` es el runtime de
+    // Claude Design, generado y vendorizado, y el .dc.html no es React.
+    "docs/**",
   ]),
 ]);
 

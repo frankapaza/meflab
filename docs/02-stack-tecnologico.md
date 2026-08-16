@@ -11,7 +11,7 @@
 
 | Capa | Tecnología | Motivo |
 |---|---|---|
-| Frontend | **Next.js 15 (App Router) + React 19 + TypeScript** | Renderizado en servidor para listados grandes, un solo despliegue, ecosistema maduro. El prototipo ya está hecho en esta base (v0), así que se reaprovecha |
+| Frontend | **Next.js 16 (App Router) + React 19.2 + TypeScript** | Renderizado en servidor para listados grandes, un solo despliegue, ecosistema maduro. Se instaló la 16 (y no la 15 que decía la v1.0) porque es la versión que entrega `create-next-app@latest` y arrancar un proyecto de 9 meses en n‑1 obliga a migrar a mitad de camino |
 | Estilos | **Tailwind CSS v4 + shadcn/ui + Radix UI** | Sistema de diseño consistente, accesible por defecto (Radix), componentes propiedad del proyecto y no de un vendor |
 | Estado de datos | **TanStack Query v5** | Caché, revalidación e invalidación por mutación: crítico en un ERP donde una acción cambia cifras en cinco pantallas |
 | Formularios | **React Hook Form + Zod** | Validación declarativa reutilizada íntegramente en el servidor |
@@ -49,11 +49,11 @@
 
 ```
                       ┌──────────────────────────────┐
-   Navegador ────────►│  Next.js en Vercel           │
+   Navegador ────────►│  Next.js 16 en Vercel        │
    (HTTPS/TLS 1.3)    │  · Server Components (RSC)   │
                       │  · Server Actions            │
                       │  · Route Handlers (API)      │
-                      │  · Middleware de sesión      │
+                      │  · proxy.ts de sesión        │
                       └───────────┬──────────────────┘
                                   │ HTTPS + JWT
                       ┌───────────▼──────────────────┐
@@ -73,6 +73,18 @@
    Resend        WhatsApp Cloud       PSE / SUNAT        Sentry
    (email)          (Meta)          (facturación)      (errores)
 ```
+
+### Lo que cambia por usar Next 16
+
+Next 16 rompe con lo que la mayoría de documentación y modelos dan por sentado. Los tres cambios que afectan a este proyecto:
+
+| Cambio | Consecuencia aquí |
+|---|---|
+| `middleware.ts` → **`proxy.ts`**, función exportada `proxy` | Es donde vive la sesión de Supabase y las guardas de ruta. Corre en runtime **nodejs**, no edge — mejor para `@supabase/ssr`, que en edge tenía limitaciones |
+| `cookies()`, `headers()`, `params`, `searchParams` son **asíncronos** | Todo cliente de Supabase en servidor se construye con `await cookies()`. El acceso síncrono ya no existe |
+| **Turbopack** por defecto en `dev` y `build` | Sin configuración de webpack. Si algún día hiciera falta, `--webpack` la reactiva |
+
+Antes de escribir código de App Router, consultar `node_modules/next/dist/docs/` — la documentación viaja con el paquete y corresponde a la versión instalada.
 
 **Reglas de arquitectura:**
 
@@ -173,8 +185,9 @@ meflab/
 │  ├─ ui/                              # shadcn: primitivos
 │  ├─ dominio/                         # OdontogramaPicker, KanbanBoard, SelectorColor…
 │  └─ layout/
+├─ proxy.ts                            # sesión y guardas de ruta (era middleware.ts)
 ├─ lib/
-│  ├─ supabase/{client,server,middleware}.ts
+│  ├─ supabase/{client,server,proxy}.ts
 │  ├─ validaciones/                    # esquemas Zod compartidos
 │  ├─ acciones/                        # Server Actions por módulo
 │  ├─ negocio/                         # cálculos: IGV, aging, score, costos
