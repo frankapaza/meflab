@@ -69,7 +69,7 @@ insert into public.categoria_servicio (id, tenant_id, nombre, orden) values
   ('a0000000-0000-4000-8000-000000000053', 'a0000000-0000-4000-8000-000000000001', 'Implantes', 4),
   ('a0000000-0000-4000-8000-000000000054', 'a0000000-0000-4000-8000-000000000001', 'Ortodoncia', 5);
 
-insert into public.servicio (tenant_id, categoria_id, area_id, codigo, nombre, precio_base)
+insert into public.servicio (tenant_id, categoria_id, area_id, codigo, nombre, precio_capturado)
 select 'a0000000-0000-4000-8000-000000000001', s.categoria,
        'a0000000-0000-4000-8000-000000000020', s.codigo, s.nombre, s.precio
 from (values

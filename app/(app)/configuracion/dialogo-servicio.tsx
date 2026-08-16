@@ -11,11 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AFECTACIONES,
-  precioEnModoCaptura,
-  valorVentaAlmacenado,
-} from "@/lib/validaciones/servicio";
+import { AFECTACIONES, valorVentaAlmacenado } from "@/lib/validaciones/servicio";
 import { cn } from "@/lib/utils";
 
 import { guardarServicio, type Resultado } from "./acciones";
@@ -33,7 +29,7 @@ export type ServicioEditable = {
   codigo: string;
   nombre: string;
   categoriaId: string | null;
-  precioBase: number;
+  precioCapturado: number;
   afectacion: string;
   activo: boolean;
 };
@@ -63,11 +59,9 @@ export function DialogoServicio({
   const refCodigo = useRef<HTMLInputElement>(null);
 
   // El precio se edita SIEMPRE en el modo en que el laboratorio lo tiene
-  // pactado. Enseñar 560.00 a quien pactó 660.80 lo llevaría a "corregir"
-  // el precio hacia arriba en cada edición.
-  const precioInicial = servicio
-    ? precioEnModoCaptura(servicio.precioBase, capturaConIgv, tasaIgv)
-    : "";
+  // pactado, y sale tal cual de la base: enseñar 560.00 a quien pactó
+  // 660.80 lo llevaría a "corregir" el precio hacia arriba en cada edición.
+  const precioInicial = servicio ? servicio.precioCapturado : "";
 
   const [c, setC] = useState({
     codigo: servicio?.codigo ?? "",

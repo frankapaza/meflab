@@ -61,7 +61,7 @@ insert into flujo_etapa (tenant_id, flujo_id, proceso_id, orden) values
   ('11111111-0000-0000-0000-000000000001', '99999999-0000-0000-0000-000000000001',
    '88888888-0000-0000-0000-000000000003', 3);
 
-insert into servicio (id, tenant_id, area_id, codigo, nombre, precio_base, flujo_id)
+insert into servicio (id, tenant_id, area_id, codigo, nombre, precio_capturado, flujo_id)
 values ('aaaa0000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001',
         '22222222-0000-0000-0000-000000000001', 'COR-ZIR', 'Corona de Zirconio',
         620.00, '99999999-0000-0000-0000-000000000001');
@@ -418,7 +418,7 @@ begin
   end if;
 
   -- Convenio A si captura con IGV: 660.80 tecleados son 560.00 guardados.
-  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio)
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio_capturado)
   values ('11111111-0000-0000-0000-000000000001',
           '44444444-0000-0000-0000-000000000002',
           'aaaa0000-0000-0000-0000-000000000001', 660.80);
@@ -431,7 +431,7 @@ begin
   end if;
 
   -- Y la misma cifra en la lista que NO captura con IGV se queda igual.
-  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio)
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio_capturado)
   values ('11111111-0000-0000-0000-000000000001',
           '44444444-0000-0000-0000-000000000001',
           'aaaa0000-0000-0000-0000-000000000001', 660.80);
@@ -445,16 +445,94 @@ begin
 
   raise notice 'OK 12 · D-07 · el modo de captura es de la lista, y se aplica al guardar';
 
+  -- ── 12a · guardar dos veces no vuelve a dividir ─────────────────────
+  -- REGRESION REAL: con la normalizacion hecha en sitio, un
+  -- `on conflict do update` disparaba el trigger dos veces sobre la misma
+  -- fila y S/ 708.00 acababan siendo S/ 508.47 en vez de S/ 600.00. No
+  -- fallaba nada: el laboratorio simplemente cobraba de menos.
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio_capturado)
+  values ('11111111-0000-0000-0000-000000000001',
+          '44444444-0000-0000-0000-000000000002',
+          'aaaa0000-0000-0000-0000-000000000001', 708.00)
+  on conflict (lista_precio_id, servicio_id)
+    do update set precio_capturado = excluded.precio_capturado;
+
+  select precio into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 600.00 then
+    raise exception 'REGRESION: un upsert de 708.00 guardo % en vez de 600.00', v_precio;
+  end if;
+
+  -- Y repetirlo tal cual tampoco lo mueve.
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio_capturado)
+  values ('11111111-0000-0000-0000-000000000001',
+          '44444444-0000-0000-0000-000000000002',
+          'aaaa0000-0000-0000-0000-000000000001', 708.00)
+  on conflict (lista_precio_id, servicio_id)
+    do update set precio_capturado = excluded.precio_capturado;
+
+  select precio into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 600.00 then
+    raise exception 'REGRESION: guardar dos veces movio el precio a %', v_precio;
+  end if;
+
+  raise notice 'OK 12a · guardar dos veces la misma tarifa no vuelve a dividir';
+
+  -- ── 12c · cambiar el modo de captura NO reprecia la tarifa ──────────
+  -- Es una preferencia de como se escribe la cifra, no una rebaja. Lo que
+  -- se recalcula es lo capturado; el valor de venta se queda quieto.
+  update lista_precio set precios_incluyen_igv = false
+   where id = '44444444-0000-0000-0000-000000000002';
+
+  select precio into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 600.00 then
+    raise exception 'Cambiar el modo repricio el servicio: % en vez de 600.00', v_precio;
+  end if;
+
+  select precio_capturado into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 600.00 then
+    raise exception 'Tras pasar a captura sin IGV deberia teclearse 600.00, no %', v_precio;
+  end if;
+
+  update lista_precio set precios_incluyen_igv = true
+   where id = '44444444-0000-0000-0000-000000000002';
+
+  select precio_capturado into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 708.00 then
+    raise exception 'Al volver a captura con IGV deberia teclearse 708.00, no %', v_precio;
+  end if;
+
+  raise notice 'OK 12c · cambiar el modo de captura reescribe la cifra, no el precio';
+
   -- ── 12b · todo cambio de precio deja rastro ─────────────────────────
   -- Sin historial, subir una tarifa es indistinguible de un dedazo, y a
   -- la pregunta "¿desde cuando cuesta esto?" no responde nadie.
+  -- El alta del servicio dejo su movimiento, y solo uno: los de las listas
+  -- llevan lista_precio_id y se cuentan aparte.
   select count(*) into n from precio_historial
-   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
-  if n <> 3 then
-    raise exception 'Deberia haber 3 movimientos de precio (1 servicio + 2 listas), hay %', n;
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001'
+     and lista_precio_id is null;
+  if n <> 1 then
+    raise exception 'El alta del servicio deberia dejar 1 movimiento, dejo %', n;
   end if;
 
-  update servicio set precio_base = 680.00
+  select count(*) into n from precio_historial
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001'
+     and lista_precio_id is not null;
+  if n < 2 then
+    raise exception 'Los precios por lista deberian dejar rastro, hay %', n;
+  end if;
+
+  update servicio set precio_capturado = 680.00
    where id = 'aaaa0000-0000-0000-0000-000000000001';
 
   select count(*) into n from precio_historial
@@ -467,7 +545,7 @@ begin
   -- Guardar el mismo precio no es un cambio de precio.
   select count(*) into n from precio_historial
    where servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
-  update servicio set precio_base = 680.00
+  update servicio set precio_capturado = 680.00
    where id = 'aaaa0000-0000-0000-0000-000000000001';
 
   select count(*) into v_ruido from precio_historial
@@ -478,6 +556,37 @@ begin
 
   raise notice 'OK 12b · el historial de precios lo escribe el trigger, sin ruido';
 
+  -- ── 13 · siempre hay UNA lista por defecto, y esta activa ───────────
+  -- Sin lista por defecto no se sabe en que modo se capturan los precios,
+  -- y el catalogo entero deja de poder darse de alta.
+  update lista_precio set es_default = true
+   where id = '44444444-0000-0000-0000-000000000002';
+
+  -- Filtrado por laboratorio: esta suite corre como superusuario, sin RLS,
+  -- y el seed de desarrollo ya dejo sus propias listas en otro tenant.
+  select count(*) into n from lista_precio
+   where tenant_id = '11111111-0000-0000-0000-000000000001' and es_default;
+  if n <> 1 then
+    raise exception 'Deberia haber exactamente 1 lista por defecto, hay %', n;
+  end if;
+
+  select count(*) into n from lista_precio
+   where id = '44444444-0000-0000-0000-000000000002' and es_default;
+  if n <> 1 then
+    raise exception 'La lista recien nombrada por defecto no lo es';
+  end if;
+
+  -- Y la de defecto no se puede retirar sin nombrar antes a otra.
+  begin
+    update lista_precio set activo = false
+     where id = '44444444-0000-0000-0000-000000000002';
+    raise exception 'La base dejo desactivar la lista por defecto';
+  exception
+    when check_violation then null;
+  end;
+
+  raise notice 'OK 13 · siempre hay una lista por defecto, y esta activa';
+
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -485,4 +594,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 17 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 20 comprobaciones pasan'

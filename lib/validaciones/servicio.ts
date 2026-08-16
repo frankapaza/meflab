@@ -61,12 +61,7 @@ export function valorVentaAlmacenado(
   return Math.round(limpio * 100) / 100;
 }
 
-/** El camino inverso, para mostrar un precio ya almacenado en su modo de captura. */
-export function precioEnModoCaptura(
-  valorVenta: number,
-  capturaConIgv: boolean,
-  tasa = 0.18,
-): number {
-  const bruto = capturaConIgv ? valorVenta * (1 + tasa) : valorVenta;
-  return Math.round(bruto * 100) / 100;
-}
+// No hay función para el camino inverso, y es deliberado: lo que se enseña
+// al editar sale de `precio_capturado`, que es lo que el usuario tecleó de
+// verdad. Reconstruirlo multiplicando por el IGV arrastra un céntimo de
+// deriva en algunos importes, y ese céntimo acabaría guardado.

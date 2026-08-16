@@ -63,6 +63,7 @@ const NAV: GrupoNav[] = [
     grupo: "CONFIGURACIÓN",
     items: [
       { href: "/configuracion", etiqueta: "Catálogo y tarifas" },
+      { href: "/configuracion/listas", etiqueta: "Listas de precio" },
       { href: "/configuracion/areas", etiqueta: "Áreas y competencias" },
       { href: "/configuracion/usuarios", etiqueta: "Usuarios y permisos" },
       { href: "/auditoria", etiqueta: "Auditoría", fase: "3" },

@@ -141,8 +141,15 @@ create table public.servicio (
   area_id       uuid not null references public.area(id),
   codigo        text not null,
   nombre        text not null,
-  -- D-03: SIEMPRE valor de venta sin IGV. Lo que cambia es cómo se captura.
-  precio_base   numeric(12,2) not null,
+  -- Lo que se TECLEÓ, en el modo de captura de la lista por defecto. Es el
+  -- dato que el laboratorio reconoce como suyo, y el que se le vuelve a
+  -- enseñar al editar.
+  precio_capturado numeric(12,2) not null,
+  -- D-03: SIEMPRE valor de venta sin IGV. DERIVADO del anterior por
+  -- `tg_normalizar_precio`; escribirlo a mano no sirve de nada, el trigger
+  -- lo recalcula. Que sea derivado es lo que hace que guardar dos veces no
+  -- vuelva a dividir.
+  precio_base   numeric(12,2) not null default 0,
   afectacion    afectacion_tributaria not null default 'gravado',
   activo        boolean not null default true,
   created_at    timestamptz not null default now(),
@@ -150,13 +157,13 @@ create table public.servicio (
   updated_at    timestamptz not null default now(),
   updated_by    uuid,
   unique (tenant_id, codigo),
-  constraint servicio_precio_no_negativo check (precio_base >= 0)
+  constraint servicio_precio_no_negativo check (precio_capturado >= 0)
 );
 
 comment on column public.servicio.area_id is
   'Obligatorio. Hasta que el laboratorio defina sus áreas apunta a GENERAL (D-06); es lo que enrutará la orden.';
 comment on column public.servicio.precio_base is
-  'Valor de venta SIN IGV, siempre. Ver normalizar_valor_venta() para la captura.';
+  'Valor de venta SIN IGV, siempre. DERIVADO de precio_capturado: lo escribe tg_normalizar_precio, no la aplicación.';
 
 -- D-07: el modo de captura es un atributo de la LISTA, no del servicio.
 -- Así conviven listas capturadas con y sin IGV y no hay que decidir nada
@@ -172,7 +179,11 @@ create table public.lista_precio (
   created_by            uuid,
   updated_at            timestamptz not null default now(),
   updated_by            uuid,
-  unique (tenant_id, nombre)
+  unique (tenant_id, nombre),
+  -- La lista por defecto es la que se aplica a un cliente sin lista
+  -- asignada. Desactivarla dejaría al laboratorio sin saber en qué modo
+  -- se capturan los precios: primero se nombra otra, luego se retira ésta.
+  constraint lista_precio_default_activa check (activo or not es_default)
 );
 
 create unique index lista_precio_default_unica
@@ -185,11 +196,14 @@ create table public.lista_precio_item (
   lista_precio_id  uuid not null references public.lista_precio(id) on delete cascade,
   servicio_id      uuid not null references public.servicio(id) on delete cascade,
   tenant_id        uuid not null references public.tenant(id) on delete cascade,
-  precio           numeric(12,2) not null,
+  -- Lo tecleado, en el modo de captura de ESTA lista.
+  precio_capturado numeric(12,2) not null,
+  -- Derivado. Ver el comentario de servicio.precio_base.
+  precio           numeric(12,2) not null default 0,
   updated_at       timestamptz not null default now(),
   updated_by       uuid,
   primary key (lista_precio_id, servicio_id),
-  constraint lista_precio_item_no_negativo check (precio >= 0)
+  constraint lista_precio_item_no_negativo check (precio_capturado >= 0)
 );
 
 alter table public.cliente
@@ -642,6 +656,15 @@ create trigger orden_trabajo_historial
 --
 -- El precio base del servicio es el de la lista por defecto: es la que se
 -- aplica a un cliente que no tiene ninguna asignada.
+--
+-- CLAVE: el precio de venta se DERIVA de `precio_capturado` en cada
+-- escritura, en vez de convertir en sitio la columna que llega. Convertir
+-- en sitio parece equivalente y no lo es: un `insert ... on conflict do
+-- update` dispara el trigger DOS veces sobre la misma fila —una por la
+-- inserción y otra por el update— y la segunda vuelve a dividir un valor
+-- ya dividido. S/ 708.00 acababan siendo S/ 508.47 en lugar de S/ 600.00.
+-- Derivar siempre del mismo origen hace que escribir dos veces dé lo
+-- mismo que escribir una.
 create or replace function public.tg_normalizar_precio()
 returns trigger
 language plpgsql
@@ -656,7 +679,7 @@ begin
      where l.tenant_id = new.tenant_id and l.es_default;
 
     new.precio_base := public.normalizar_valor_venta(
-      new.precio_base, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
+      new.precio_capturado, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
     );
   else
     select l.precios_incluyen_igv into v_incluye
@@ -664,7 +687,7 @@ begin
      where l.id = new.lista_precio_id;
 
     new.precio := public.normalizar_valor_venta(
-      new.precio, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
+      new.precio_capturado, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
     );
   end if;
 
@@ -672,13 +695,83 @@ begin
 end;
 $$;
 
+-- Sin lista de columnas: si alguien tocara `precio_base` a mano, el
+-- trigger lo devuelve a su valor derivado en vez de dejarlo desviarse.
 create trigger servicio_normalizar_precio
-  before insert or update of precio_base on public.servicio
+  before insert or update on public.servicio
   for each row execute function public.tg_normalizar_precio();
 
 create trigger lista_precio_item_normalizar
-  before insert or update of precio on public.lista_precio_item
+  before insert or update on public.lista_precio_item
   for each row execute function public.tg_normalizar_precio();
+
+-- Cambiar el modo de captura de una lista NO cambia lo que vale un
+-- servicio: cambia cómo se escribe esa misma cifra. Así que lo que se
+-- recalcula es lo capturado, dejando fijo el valor de venta.
+--
+-- Al revés —dejar fijo lo capturado y recalcular el valor de venta— una
+-- preferencia de visualización repreciaría en silencio toda la tarifa.
+create or replace function public.tg_lista_modo_capturado()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_tasa numeric := public.tasa_igv(new.tenant_id);
+begin
+  update public.lista_precio_item i
+     set precio_capturado = round(
+           case when new.precios_incluyen_igv then i.precio * (1 + v_tasa) else i.precio end, 2)
+   where i.lista_precio_id = new.id;
+
+  if new.es_default then
+    update public.servicio s
+       set precio_capturado = round(
+             case when new.precios_incluyen_igv then s.precio_base * (1 + v_tasa) else s.precio_base end, 2)
+     where s.tenant_id = new.tenant_id;
+  end if;
+
+  return null;
+end;
+$$;
+
+create trigger lista_precio_modo_capturado
+  after update on public.lista_precio
+  for each row when (
+    old.precios_incluyen_igv is distinct from new.precios_incluyen_igv
+    -- Al nombrar por defecto una lista con otro modo, el precio base del
+    -- catálogo pasa a capturarse en ese modo.
+    or (new.es_default and not old.es_default)
+  )
+  execute function public.tg_lista_modo_capturado();
+
+-- Hay exactamente UNA lista por defecto, y el índice parcial
+-- `lista_precio_default_unica` lo garantiza. Pero un índice único sólo
+-- sabe decir que no: sin esto, marcar una lista nueva como la de defecto
+-- fallaría con un error de clave duplicada y obligaría a la aplicación a
+-- hacer dos escrituras — con la ventana de quedarse sin ninguna por
+-- defecto si la segunda falla, y sin lista por defecto no se sabe en qué
+-- modo se capturan los precios.
+create or replace function public.tg_lista_default_unica()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.es_default then
+    update public.lista_precio
+       set es_default = false
+     where tenant_id = new.tenant_id
+       and id <> new.id
+       and es_default;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger lista_precio_default
+  before insert or update of es_default on public.lista_precio
+  for each row when (new.es_default) execute function public.tg_lista_default_unica();
 
 -- Todo cambio de precio deja rastro, con autor y fecha.
 --
@@ -729,12 +822,16 @@ begin
 end;
 $$;
 
+-- Sin lista de columnas: el precio de venta lo escribe el trigger BEFORE a
+-- partir de `precio_capturado`, así que `update of precio_base` no llegaría
+-- a dispararse nunca. La función ya descarta los updates que no mueven el
+-- precio, así que no hay ruido.
 create trigger servicio_precio_historial
-  after insert or update of precio_base on public.servicio
+  after insert or update on public.servicio
   for each row execute function public.tg_precio_historial();
 
 create trigger lista_precio_item_historial
-  after insert or update of precio on public.lista_precio_item
+  after insert or update on public.lista_precio_item
   for each row execute function public.tg_precio_historial();
 
 do $$

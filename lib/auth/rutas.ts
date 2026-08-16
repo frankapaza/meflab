@@ -60,6 +60,7 @@ const REGLAS: Record<string, readonly string[]> = {
 
   // Configuración — sólo Administrador escribe; Gerencia consulta
   "/configuracion": ["administrador", "gerencia"],
+  "/configuracion/listas": ["administrador", "gerencia"],
   "/configuracion/usuarios": ["administrador"],
   "/configuracion/areas": ["administrador"],
   "/auditoria": ["administrador", "gerencia"],

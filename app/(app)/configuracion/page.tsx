@@ -1,8 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { contextoActual } from "@/lib/auth/permisos";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { precioEnModoCaptura } from "@/lib/validaciones/servicio";
 
 import { BotonActivoServicio } from "./boton-activo";
 import {
@@ -24,6 +24,7 @@ type Fila = {
   codigo: string;
   nombre: string;
   categoria_id: string | null;
+  precio_capturado: number;
   precio_base: number;
   afectacion: string;
   activo: boolean;
@@ -41,7 +42,7 @@ export default async function CatalogoPage() {
       supabase
         .from("servicio")
         .select(
-          "id, codigo, nombre, categoria_id, precio_base, afectacion, activo, categoria:categoria_id(nombre)",
+          "id, codigo, nombre, categoria_id, precio_capturado, precio_base, afectacion, activo, categoria:categoria_id(nombre)",
         )
         .order("codigo"),
       supabase.from("categoria_servicio").select("id, nombre").order("orden"),
@@ -160,7 +161,7 @@ export default async function CatalogoPage() {
                     codigo: s.codigo,
                     nombre: s.nombre,
                     categoriaId: s.categoria_id,
-                    precioBase: s.precio_base,
+                    precioCapturado: s.precio_capturado,
                     afectacion: s.afectacion,
                     activo: s.activo,
                   };
@@ -194,14 +195,12 @@ export default async function CatalogoPage() {
                         {s.categoria?.nombre ?? <span className="text-ink-3">—</span>}
                       </td>
 
-                      {/* La columna de captura y la de almacenado coinciden
-                          cuando la lista captura sin IGV. No es redundancia:
-                          es la prueba visible de que no se está dividiendo
-                          nada por detrás. */}
+                      {/* Lo tecleado y lo almacenado coinciden cuando la
+                          lista captura sin IGV. No es redundancia: es la
+                          prueba visible de que no se divide nada por detrás.
+                          Ambas salen de la base, ninguna se reconstruye. */}
                       <td className="px-pad-x py-s3 text-right font-mono text-sm tabular-nums text-ink-2">
-                        {soles.format(
-                          precioEnModoCaptura(s.precio_base, capturaConIgv, tasaIgv),
-                        )}
+                        {soles.format(s.precio_capturado)}
                       </td>
 
                       <td className="px-pad-x py-s3 text-right font-mono text-sm font-semibold tabular-nums">
@@ -239,12 +238,20 @@ export default async function CatalogoPage() {
         )}
       </div>
 
-      {/* Las listas de precio por cliente son la historia 6. Aquí sólo se
-          consulta cuál manda hoy, porque es lo que decide cómo se captura. */}
+      {/* Aquí sólo se resume cuál manda hoy, porque es lo que decide cómo se
+          captura el precio base. Tarifarla es otra pantalla. */}
       <div className="flex flex-col gap-s2 rounded-r2 border border-line bg-card p-s4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-2">
-          Listas de precio
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-s3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-2">
+            Listas de precio
+          </h2>
+          <Link
+            href="/configuracion/listas"
+            className="grid h-[30px] place-items-center rounded-r1 border border-line bg-card px-s3 text-sm text-ink hover:bg-fill"
+          >
+            Gestionar listas
+          </Link>
+        </div>
         <ul className="flex flex-col gap-s1">
           {(listas ?? []).map((l) => (
             <li key={l.id} className="flex flex-wrap items-center gap-s2 text-sm">
@@ -261,8 +268,9 @@ export default async function CatalogoPage() {
           ))}
         </ul>
         <p className="text-sm text-ink-3">
-          Asignar una lista a cada cliente y fijar precios por lista llega en la
-          historia 6. Hoy manda el precio base del servicio.
+          Un servicio sin precio propio en una lista se cobra al precio base del
+          catálogo. La lista de cada cliente se asigna en sus condiciones
+          comerciales.
         </p>
       </div>
     </div>

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  precioEnModoCaptura,
-  servicioSchema,
-  valorVentaAlmacenado,
-} from "@/lib/validaciones/servicio";
+import { servicioSchema, valorVentaAlmacenado } from "@/lib/validaciones/servicio";
 
 const SERVICIO = {
   codigo: "COR-ZIR",
@@ -85,20 +81,14 @@ describe("valorVentaAlmacenado · D-07", () => {
   });
 });
 
-describe("precioEnModoCaptura", () => {
-  it("devuelve el precio tal cual si la lista captura sin IGV", () => {
-    expect(precioEnModoCaptura(620, false)).toBe(620);
-  });
-
-  it("reconstruye el precio bruto si la lista captura con IGV", () => {
-    // Es lo que se le enseña al que pactó 660.80: verle 560.00 en la
-    // pantalla le haría "corregir" el precio hacia arriba en cada edición.
-    expect(precioEnModoCaptura(560, true)).toBe(660.8);
-  });
-
-  it("va y vuelve sin desviarse en los casos redondos", () => {
-    for (const bruto of [660.8, 118, 236, 1180]) {
-      expect(precioEnModoCaptura(valorVentaAlmacenado(bruto, true), true)).toBe(bruto);
-    }
+describe("valorVentaAlmacenado · es idempotente sobre lo capturado", () => {
+  it("aplicado dos veces al MISMO origen da lo mismo", () => {
+    // Es la propiedad que hace segura la tarifa: la base deriva el valor
+    // de venta de `precio_capturado` en cada escritura, así que guardar
+    // dos veces no vuelve a dividir. Convertir en sitio no la cumplía, y
+    // un `on conflict do update` dejaba 708.00 en 508.47.
+    const capturado = 708;
+    expect(valorVentaAlmacenado(capturado, true)).toBe(600);
+    expect(valorVentaAlmacenado(capturado, true)).toBe(600);
   });
 });

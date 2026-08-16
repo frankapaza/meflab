@@ -75,10 +75,11 @@ export async function guardarServicio(
       categoria_id: categoriaId,
       codigo: datos.codigo.toUpperCase(),
       nombre: datos.nombre,
-      // Se manda TAL COMO SE TECLEÓ. La base normaliza según el modo de
-      // captura de la lista por defecto (D-07); hacerlo también aquí lo
-      // dividiría dos veces.
-      precio_base: datos.precio,
+      // Se manda TAL COMO SE TECLEÓ, y a la columna de lo capturado. El
+      // valor de venta lo deriva la base según el modo de captura de la
+      // lista por defecto (D-07); escribirlo desde aquí no serviría de
+      // nada, el trigger lo recalcula.
+      precio_capturado: datos.precio,
       afectacion: datos.afectacion,
       activo: datos.activo ?? true,
     };

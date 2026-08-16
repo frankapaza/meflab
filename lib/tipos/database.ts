@@ -809,6 +809,7 @@ export type Database = {
         Row: {
           lista_precio_id: string
           precio: number
+          precio_capturado: number
           servicio_id: string
           tenant_id: string
           updated_at: string
@@ -816,7 +817,8 @@ export type Database = {
         }
         Insert: {
           lista_precio_id: string
-          precio: number
+          precio?: number
+          precio_capturado: number
           servicio_id: string
           tenant_id: string
           updated_at?: string
@@ -825,6 +827,7 @@ export type Database = {
         Update: {
           lista_precio_id?: string
           precio?: number
+          precio_capturado?: number
           servicio_id?: string
           tenant_id?: string
           updated_at?: string
@@ -1296,6 +1299,7 @@ export type Database = {
           id: string
           nombre: string
           precio_base: number
+          precio_capturado: number
           tenant_id: string
           updated_at: string
           updated_by: string | null
@@ -1311,7 +1315,8 @@ export type Database = {
           flujo_id?: string | null
           id?: string
           nombre: string
-          precio_base: number
+          precio_base?: number
+          precio_capturado: number
           tenant_id: string
           updated_at?: string
           updated_by?: string | null
@@ -1328,6 +1333,7 @@ export type Database = {
           id?: string
           nombre?: string
           precio_base?: number
+          precio_capturado?: number
           tenant_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -1738,6 +1744,7 @@ export type Database = {
         Args: { p_serie: string; p_tenant: string; p_tipo_doc: string }
         Returns: number
       }
+      tasa_igv: { Args: { p_tenant: string }; Returns: number }
       tiene_rol: { Args: { roles: string[] }; Returns: boolean }
     }
     Enums: {
