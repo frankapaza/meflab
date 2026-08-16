@@ -54,11 +54,26 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 | `0001_core.sql` | Tenant, sedes, usuarios, roles y permisos, configuración, series y correlativos, auditoría por trigger, funciones de contexto RLS | 8 |
 | `0002_operacion.sql` | Cliente/doctor/paciente, catálogo y tarifas, flujos y procesos, orden de trabajo, detalle de venta, tareas de producción, archivos, calidad, retrabajos, entregas, inventario, compras | 37 |
 | `0003_finanzas.sql` | Documentos, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, cobranza, promesas, notificaciones, vistas de KPI, funciones transaccionales | 15 + 7 vistas |
-| `0004_areas_y_roles.sql` | Área productiva, `area_id` en las 6 tablas que la requieren, `usuario_rol` (N:M), `usuario_area_apoyo`, `lista_precio.precios_incluyen_igv`, funciones `tiene_rol()` y `areas_del_usuario()`, RLS por área | 3 + 6 alter |
-
 **Total: 63 tablas, 7 vistas, 16 funciones.**
 
-> **`0004` va en la Fase 0, no después.** Aunque las áreas no se usen en la interfaz del MVP (D‑06), la columna tiene que existir antes de que haya datos. Aplicarla después obliga a migrar 6 tablas y reasignar cada registro a mano. Lo mismo con `usuario_rol`: hace falta desde el primer login porque el sponsor ejerce de Gerente y Administrador a la vez.
+> **Ya no existe `0004_areas_y_roles.sql`.** Ese archivo era un parche sobre un anexo SQL que se daba por existente, y ese anexo nunca existió: las migraciones se escribieron desde cero en la Fase 0. Escribir `usuario.rol` en `0001` para reemplazarlo en `0004` habría sido escribir código que ya sabemos que está mal, así que **los roles N:M y `area_id` entran correctos desde `0001`**, y `lista_precio.precios_incluyen_igv` desde `0002`.
+>
+> Lo que sí se mantiene es el motivo: aunque las áreas no se usen en la interfaz del MVP (D‑06), la columna tiene que existir antes de que haya datos. Y `usuario_rol` hace falta desde el primer login, porque el sponsor ejerce de Gerente y Administrador a la vez.
+
+### Dos reglas que toda migración nueva debe repetir
+
+1. **RLS y `GRANT` son cosas distintas y hacen falta las dos.** RLS filtra *filas*; el `GRANT` da acceso a la *tabla*. Sin grant, la política ni siquiera se evalúa y Postgres responde `permission denied`. Se descubrió probando, no leyendo.
+2. **Nada de asumir que toda tabla tiene columna `id`.** `configuracion` es `(tenant_id, clave)` y `usuario_rol` es `(usuario_id, rol)`. El trigger de auditoría deriva la clave primaria de `pg_index`.
+
+### Pruebas de la base
+
+```bash
+npm run db:start   # levanta Postgres, Auth, Storage y Studio en Docker
+npm run db:test    # reset + pruebas de RLS y auditoría
+npm run db:studio  # http://127.0.0.1:54323
+```
+
+`supabase/tests/` ataca la base **directamente**, no a través de la interfaz: una regla que sólo se prueba desde el front no está probada. Hoy cubre aislamiento entre laboratorios, escalada de privilegios, unión de roles e inalterabilidad de la bitácora.
 
 Las decisiones del documento DD‑01 están implementadas en el esquema, no sólo documentadas:
 

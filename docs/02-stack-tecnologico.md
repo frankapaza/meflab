@@ -17,7 +17,7 @@
 | Formularios | **React Hook Form + Zod** | Validación declarativa reutilizada íntegramente en el servidor |
 | Gráficos | **Recharts** | Ya usado en el prototipo, suficiente para los KPIs del dashboard |
 | Tablas | **TanStack Table v8** | Grillas con orden, filtro, paginación en servidor y exportación |
-| Backend / BD | **Supabase (PostgreSQL 15 + Auth + Storage + Realtime + Edge Functions)** | Postgres real con RLS: la seguridad multi‑tenant vive en la base, no en el código. Reduce a la mitad el backend a construir |
+| Backend / BD | **Supabase (PostgreSQL 17 + Auth + Storage + Realtime + Edge Functions)** | Postgres real con RLS: la seguridad multi‑tenant vive en la base, no en el código. Reduce a la mitad el backend a construir |
 | ORM / acceso | **supabase-js + @supabase/ssr** y SQL directo para reportes | Tipos generados desde el esquema; SQL crudo donde importa el rendimiento |
 | Hosting | **Vercel** | Integración nativa con Next.js, TLS automático, preview por rama |
 | Archivos | **Supabase Storage** | Fotografías, STL, PDF y vouchers con las mismas políticas RLS |
@@ -59,7 +59,7 @@
                       ┌───────────▼──────────────────┐
                       │  Supabase                    │
                       │  ┌────────────────────────┐  │
-                      │  │ PostgreSQL 15 + RLS    │  │
+                      │  │ PostgreSQL 17 + RLS    │  │
                       │  │  · esquema meflab      │  │
                       │  │  · triggers auditoría  │  │
                       │  │  · vistas KPI          │  │
