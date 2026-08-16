@@ -44,6 +44,13 @@
   --err: #a3271c;
   --err-bg: #fce9e6;
 
+  /* paleta de DATOS · no es el verde de marca a propósito: con croma 0,086
+     el acento se lee gris como marca de gráfico. Estos tres pasan el
+     validador de daltonismo sobre la superficie clara. */
+  --dato-1: #0e9c8a;
+  --dato-2: #d1490b;
+  --dato-3: #2563eb;
+
   /* los 10 estados de trabajo · el GLIFO sostiene el significado (ver
      lib/dominio/estados.ts); el color solo refuerza */
   --st-1: #64748b;
@@ -109,6 +116,12 @@
   --warn-bg: #31240a;
   --err: #fb7185;
   --err-bg: #331419;
+
+  /* Los mismos tres, re-escalonados contra la superficie oscura. No es un
+     volteo automático: se eligen y se validan aparte. */
+  --dato-1: #10a897;
+  --dato-2: #e8691a;
+  --dato-3: #4785f7;
 
   --st-1: #94a3b8;
   --st-2: #d4a017;

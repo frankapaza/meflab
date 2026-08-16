@@ -191,28 +191,41 @@ Lo mínimo para que el laboratorio abandone el Excel y el cuaderno.
 
 Orden de construcción. Cada ítem es entregable y demostrable por separado.
 
-| # | Historia | Pts | Depende de | v1.0 |
+| # | Historia | Pts | Depende de | Estado |
 |---|---|---|---|---|
-| 1 | Como Administrador, creo usuarios y les asigno **uno o varios roles** | 8 | Fase 0 | 5 → 8 |
-| 2 | Como Recepción, registro un cliente (clínica o doctor independiente) con sus condiciones comerciales | 8 | 1 | = |
-| 3 | Como Recepción, **gestiono los doctores**: lista con filtros, alta, edición y baja | 8 | 2 | 3 → 8 |
-| 4 | Como Recepción, registro un paciente completo o simplificado | 3 | 3 | = |
-| 5 | Como Administrador, mantengo el catálogo de servicios, **declarando si los precios de cada lista incluyen IGV** | 7 | 1 | 5 → 7 |
-| 6 | Como Administrador, defino listas de precio y asigno una a cada cliente | 5 | 5 | = |
-| 7 | Como Administrador, configuro procesos y flujos por tipo de trabajo | 8 | 5 | = |
-| 8 | Como Recepción, registro una orden con servicios, pieza (odontograma), color, material y fechas | 13 | 4, 6 | = |
-| 9 | Como Recepción, adjunto fotos, STL y prescripciones a la orden | 8 | 8 | = |
-| 10 | Como sistema, genero el número de orden e instancio las etapas del flujo | 5 | 7, 8 | = |
-| 11 | Como responsable de producción, veo el kanban con semáforo de fechas y filtros | 8 | 10 | = |
-| 12 | Como responsable de producción, asigno etapas a los técnicos según su carga | 8 | 11 | = |
-| 13 | Como Técnico, veo mis tareas y registro inicio y fin | 5 | 12 | = |
-| 14 | Como responsable de producción, cambio el estado de la orden y queda historial | 5 | 11 | = |
-| 15 | Como Recepción, registro la entrega con receptor y evidencia | 5 | 14 | = |
-| 16 | Como cualquier usuario, veo **mi dashboard con gráficos**: KPIs con tendencia, embudo, carga y alertas | 13 | 13, 14 | 8 → 13 |
-| 17 | Como Recepción, busco cualquier orden, doctor o paciente desde el buscador global | 5 | 8 | = |
-| 18 | Como Recepción, abro la **vista 360°** de un doctor desde su ficha en la lista | 5 | 3, 8 | = |
+| 1 | Como Administrador, creo usuarios y les asigno **uno o varios roles** | 8 | Fase 0 | ■ hecha |
+| 2 | Como Recepción, registro un cliente (clínica o doctor independiente) con sus condiciones comerciales | 8 | 1 | ■ hecha |
+| 3 | Como Recepción, **gestiono los doctores**: lista con filtros, alta, edición y baja | 8 | 2 | ■ hecha |
+| 4 | Como Recepción, registro un paciente completo o simplificado | 3 | 3 | ■ hecha |
+| 5 | Como Administrador, mantengo el catálogo de servicios, **declarando si los precios de cada lista incluyen IGV** | 7 | 1 | ■ hecha |
+| 6 | Como Administrador, defino listas de precio y asigno una a cada cliente | 5 | 5 | ■ hecha |
+| 7 | Como Administrador, configuro procesos y flujos por tipo de trabajo | 8 | 5 | ■ hecha |
+| 8 | Como Recepción, registro una orden con servicios, pieza (odontograma), color, material y fechas | 13 | 4, 6 | ■ hecha |
+| 9 | Como Recepción, adjunto fotos, STL y prescripciones a la orden | 8 | 8 | ○ pendiente |
+| 10 | Como sistema, genero el número de orden e instancio las etapas del flujo | 5 | 7, 8 | ■ hecha · dentro de `registrar_orden` |
+| 11 | Como responsable de producción, veo el kanban con semáforo de fechas y filtros | 8 | 10 | ◑ parcial · hay tablero con semáforo, falta el kanban por columnas y los filtros |
+| 12 | Como responsable de producción, asigno etapas a los técnicos según su carga | 8 | 11 | ■ hecha |
+| 13 | Como Técnico, veo mis tareas y registro inicio y fin | 5 | 12 | ■ hecha |
+| 14 | Como responsable de producción, cambio el estado de la orden y queda historial | 5 | 11 | ■ hecha |
+| 15 | Como Recepción, registro la entrega con receptor y evidencia | 5 | 14 | ◑ parcial · receptor y método sí; la evidencia adjunta depende de la 9 |
+| 16 | Como cualquier usuario, veo **mi dashboard con gráficos**: KPIs con tendencia, embudo, carga y alertas | 13 | 13, 14 | ◑ parcial · seis gráficos con datos reales; falta configurarlo por rol |
+| 17 | Como Recepción, busco cualquier orden, doctor o paciente desde el buscador global | 5 | 8 | ■ hecha |
+| 18 | Como Recepción, abro la **vista 360°** de un doctor desde su ficha en la lista | 5 | 3, 8 | ■ hecha |
 
 **Total: 127 puntos.** A 15 puntos/semana con 2 desarrolladores → **≈9 semanas**.
+
+**Avance al 16/08/2026: 13 historias completas y 3 parciales.** Lo que falta
+para cerrar el MVP:
+
+| Falta | Pts | Por qué no está |
+|---|---|---|
+| **9 · Adjuntos** (fotos, STL, prescripciones) | 8 | Necesita Supabase Storage con política por `tenant_id` en el primer segmento de la ruta. La tabla `archivo` y la convención ya existen desde la Fase 0; falta el bucket, la política y la subida. |
+| **11 · Kanban por columnas y filtros** | 4 de 8 | El tablero ya existe con semáforo de fechas y glifos; falta agruparlo por estado en columnas y filtrar por doctor, técnico y prioridad. |
+| **15 · Evidencia de entrega** | 2 de 5 | Depende de la 9: sin adjuntos no hay foto de evidencia. |
+| **16 · Dashboard configurable por rol** | 4 de 13 | Los seis gráficos están con datos reales; falta que cada rol elija los suyos y que se guarde la preferencia. |
+
+Todo lo demás del MVP está construido, verificado en el navegador y cubierto
+por pruebas.
 
 ### Backlog en espera — se activa cuando se definan las áreas
 
