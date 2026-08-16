@@ -52,9 +52,9 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 | Archivo | Contenido | Tablas |
 |---|---|---|
 | `0001_core.sql` | Tenant, sedes, usuarios, roles y permisos, configuración, series y correlativos, auditoría por trigger, funciones de contexto RLS | 8 |
-| `0002_operacion.sql` | Cliente/doctor/paciente, catálogo y tarifas, flujos y procesos, orden de trabajo, detalle de venta, tareas de producción, archivos, calidad, retrabajos, entregas, inventario, compras | 37 |
-| `0003_finanzas.sql` | Documentos, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, cobranza, promesas, notificaciones, vistas de KPI, funciones transaccionales | 15 + 7 vistas |
-**Total: 63 tablas, 7 vistas, 16 funciones.**
+| `0002_operacion.sql` | Cliente/doctor/paciente, catálogo y tarifas, listas de precio con captura de IGV, colores, procesos y flujos, estados, orden de trabajo, detalle de venta, tareas de producción, archivos y entregas | 20 |
+| `0003_finanzas.sql` *(Fase 2)* | Documentos, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, cobranza, promesas, notificaciones, vistas de KPI, funciones transaccionales | 15 + 7 vistas |
+**Aplicadas en Fase 0:  y  — 29 tablas, 55 políticas, 15 funciones.**  entra en la Fase 2 y  en la Fase 3: **las migraciones siguen las fases**, no se escribe hoy un esquema que no se estrena hasta dentro de seis meses.
 
 > **Ya no existe `0004_areas_y_roles.sql`.** Ese archivo era un parche sobre un anexo SQL que se daba por existente, y ese anexo nunca existió: las migraciones se escribieron desde cero en la Fase 0. Escribir `usuario.rol` en `0001` para reemplazarlo en `0004` habría sido escribir código que ya sabemos que está mal, así que **los roles N:M y `area_id` entran correctos desde `0001`**, y `lista_precio.precios_incluyen_igv` desde `0002`.
 >
