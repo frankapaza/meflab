@@ -1705,6 +1705,10 @@ export type Database = {
       area_default: { Args: { p_tenant: string }; Returns: string }
       areas_del_usuario: { Args: never; Returns: string[] }
       asegurar_append_only: { Args: never; Returns: undefined }
+      cambiar_estado_orden: {
+        Args: { p_estado: string; p_orden: string }
+        Returns: undefined
+      }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       documento_valido: {

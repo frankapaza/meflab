@@ -1287,7 +1287,64 @@ $$;
 comment on function public.registrar_orden is
   'Cabecera + líneas + correlativo + tareas en una sola transacción. A medias no es media orden, es una orden rota.';
 
--- ── 16 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
+-- ── 16 · CAMBIO DE ESTADO DE UNA ORDEN ────────────────────────────────
+-- Quien mueve una orden por el tablero es producción, no recepción. Pero
+-- la política de escritura de `orden_trabajo` es de recepción, y RLS
+-- concede la FILA entera: abrírsela a los líderes les dejaría también
+-- cambiar el cliente o el precio de un trabajo ya pactado.
+--
+-- Una función security definer resuelve justo eso: comprueba el rol y
+-- toca UNA columna. El historial lo escribe el trigger, como siempre.
+create or replace function public.cambiar_estado_orden(
+  p_orden  uuid,
+  p_estado uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tenant uuid := public.current_tenant_id();
+begin
+  if v_tenant is null then
+    raise exception 'Sin sesión válida' using errcode = '42501';
+  end if;
+
+  if not public.tiene_rol('administrador','lider_laboratorio','lider_area','recepcion') then
+    raise exception 'Tu rol no mueve órdenes por el tablero' using errcode = '42501';
+  end if;
+
+  -- security definer salta la RLS, así que el laboratorio se comprueba
+  -- aquí a mano. Sin este `where`, sería una puerta entre laboratorios.
+  if not exists (
+    select 1 from public.estado_trabajo e
+     where e.id = p_estado and e.tenant_id = v_tenant and e.activo
+  ) then
+    raise exception 'Ese estado no existe en este laboratorio' using errcode = '42501';
+  end if;
+
+  update public.orden_trabajo
+     set estado_id = p_estado,
+         -- La fecha de entrega la fija el propio ciclo: si se pidiera
+         -- aparte, acabaría en blanco en la mitad de las órdenes.
+         fecha_entrega = case
+           when (select fase from public.estado_trabajo where id = p_estado) = 'final'
+             then coalesce(fecha_entrega, now())
+           else fecha_entrega
+         end
+   where id = p_orden and tenant_id = v_tenant;
+
+  if not found then
+    raise exception 'Esa orden no existe' using errcode = '42501';
+  end if;
+end;
+$$;
+
+comment on function public.cambiar_estado_orden is
+  'Mueve una orden de estado comprobando el rol, sin abrir la fila entera a producción. El historial lo escribe el trigger.';
+
+-- ── 17 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
 -- El paciente es la única persona del sistema que no es cliente nuestro y
 -- que no ha consentido nada: llega en la orden de su odontólogo. El
 -- técnico necesita saber PARA QUIÉN es el trabajo, no quién es.
