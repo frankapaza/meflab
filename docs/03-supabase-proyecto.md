@@ -1,7 +1,7 @@
 # MEFLAB — Definición y puesta en marcha del proyecto Supabase
 
 **Documento:** SB-01
-**Versión:** 1.1 — añade la migración `0004_areas_y_roles.sql`, el claim `roles[]` y la normalización de IGV
+**Versión:** 1.2 — migraciones escritas y probadas en local; el claim pasa a `roles[]`; normalización de IGV al guardar
 **Fecha:** 16/08/2026
 
 > **Nota:** el proyecto Supabase debe crearlo tú desde tu cuenta (requiere tus credenciales y define la facturación). Este documento deja listo todo lo demás: nombre, región, esquema, políticas, buckets, jobs y el orden exacto de ejecución.
@@ -24,8 +24,8 @@
 ## 2. Orden de puesta en marcha
 
 ```bash
-# 1. Instalar CLI
-npm install -g supabase
+# 1. Instalar CLI (el global con npm no está soportado)
+npm install supabase --save-dev
 
 # 2. Inicializar en el repositorio
 supabase init
@@ -54,7 +54,11 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 | `0001_core.sql` | Tenant, sedes, usuarios, roles y permisos, configuración, series y correlativos, auditoría por trigger, funciones de contexto RLS | 8 |
 | `0002_operacion.sql` | Cliente/doctor/paciente, catálogo y tarifas, listas de precio con captura de IGV, colores, procesos y flujos, estados, orden de trabajo, detalle de venta, tareas de producción, archivos y entregas | 20 |
 | `0003_finanzas.sql` *(Fase 2)* | Documentos, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, cobranza, promesas, notificaciones, vistas de KPI, funciones transaccionales | 15 + 7 vistas |
-**Aplicadas en Fase 0:  y  — 29 tablas, 55 políticas, 15 funciones.**  entra en la Fase 2 y  en la Fase 3: **las migraciones siguen las fases**, no se escribe hoy un esquema que no se estrena hasta dentro de seis meses.
+| `0004_calidad_inventario.sql` *(Fase 3)* | Control de calidad, retrabajos y garantías, inventario con lotes, compras y proveedores | por definir |
+
+**Aplicadas en Fase 0: `0001_core` y `0002_operacion` — 29 tablas, 55 políticas RLS, 15 funciones**, verificadas con `npm run db:test`.
+
+`0003_finanzas` entra en la Fase 2 y `0004_calidad_inventario` en la Fase 3: **las migraciones siguen las fases**. Escribir hoy un esquema que no se estrena hasta dentro de seis meses es escribir algo que va a cambiar antes de usarse.
 
 > **Ya no existe `0004_areas_y_roles.sql`.** Ese archivo era un parche sobre un anexo SQL que se daba por existente, y ese anexo nunca existió: las migraciones se escribieron desde cero en la Fase 0. Escribir `usuario.rol` en `0001` para reemplazarlo en `0004` habría sido escribir código que ya sabemos que está mal, así que **los roles N:M y `area_id` entran correctos desde `0001`**, y `lista_precio.precios_incluyen_igv` desde `0002`.
 >
@@ -81,7 +85,7 @@ Las decisiones del documento DD‑01 están implementadas en el esquema, no sól
 - **D‑02** → `cuenta_cobrar.documento_id` es `unique not null`; **no existe** ninguna columna de deuda en `orden_trabajo`. La vista `v_cartera` es la única fuente de verdad.
 - **D‑03** → `servicio.precio_base` sin IGV, `afectacion` por línea, importes desagregados en `documento` con los campos que exige SUNAT.
 - **D‑04** → `detalle_trabajo` (venta) y `tarea_produccion` (producción) son tablas distintas.
-- **D‑05** → `tenant_id` en las 63 tablas, con política RLS generada en bucle.
+- **D‑05** → `tenant_id` y política RLS en TODA tabla de negocio, sin excepción. Verificado por prueba: no queda ninguna sin RLS.
 - **D‑06** → `area_id not null default (área GENERAL del tenant)` en `servicio`, `detalle_trabajo`, `tarea_produccion`, `proceso`, `flujo_produccion` y `usuario`. El seed crea un área `GENERAL` por laboratorio.
 - **D‑07** → `lista_precio.precios_incluyen_igv boolean not null default false`; la normalización a valor de venta se hace en la función de guardado, nunca al leer.
 
