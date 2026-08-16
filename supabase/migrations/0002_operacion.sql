@@ -1098,7 +1098,50 @@ comment on function public.registrar_doctor_independiente is
 -- agrupa VARIOS doctores con una sola deuda — es el caso central de D-01.
 -- Un índice sobre doctor(cliente_id) rompería justamente eso.
 
--- ── 13 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
+-- ── 13 · SECUENCIA DE ETAPAS DE UN FLUJO ──────────────────────────────
+-- Reordenar etapas no se puede hacer fila a fila: `unique (flujo_id,
+-- orden)` hace que intercambiar la 2 y la 3 choque a mitad de camino. Y
+-- borrar todas y reinsertarlas desde la aplicación deja el flujo VACÍO si
+-- la segunda llamada falla — y un flujo vacío instancia cero tareas, así
+-- que las órdenes que lo usen entran en producción sin nada que hacer.
+--
+-- Aquí las dos cosas ocurren en la misma transacción.
+--
+-- security invoker: se ejecuta con los permisos de quien llama, así que
+-- RLS sigue aplicando.
+create or replace function public.fijar_etapas_flujo(
+  p_flujo    uuid,
+  p_procesos uuid[]
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_tenant uuid;
+begin
+  select tenant_id into v_tenant
+    from public.flujo_produccion where id = p_flujo;
+
+  if v_tenant is null then
+    raise exception 'El flujo no existe' using errcode = '42501';
+  end if;
+
+  delete from public.flujo_etapa where flujo_id = p_flujo;
+
+  insert into public.flujo_etapa (tenant_id, flujo_id, proceso_id, orden)
+  select v_tenant, p_flujo, p.proceso, p.orden
+    from unnest(p_procesos) with ordinality as p(proceso, orden);
+
+  return coalesce(array_length(p_procesos, 1), 0);
+end;
+$$;
+
+comment on function public.fijar_etapas_flujo is
+  'Reescribe la secuencia de etapas de un flujo de una vez. Atómico: un fallo no deja el flujo vacío.';
+
+-- ── 14 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
 -- El paciente es la única persona del sistema que no es cliente nuestro y
 -- que no ha consentido nada: llega en la orden de su odontólogo. El
 -- técnico necesita saber PARA QUIÉN es el trabajo, no quién es.

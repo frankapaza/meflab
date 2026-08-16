@@ -81,6 +81,7 @@ export async function guardarServicio(
       // nada, el trigger lo recalcula.
       precio_capturado: datos.precio,
       afectacion: datos.afectacion,
+      flujo_id: datos.flujoId || null,
       activo: datos.activo ?? true,
     };
 

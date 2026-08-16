@@ -39,6 +39,10 @@ export const servicioSchema = z.object({
     .min(0, "El precio no puede ser negativo.")
     .max(999_999.99, "Ese precio es demasiado alto."),
   afectacion: z.enum(["gravado", "exonerado", "inafecto"]),
+  // Sin flujo, una orden con este servicio entra en producción sin ninguna
+  // tarea. Se permite guardarlo así —el catálogo se carga antes que los
+  // flujos— pero la pantalla lo avisa.
+  flujoId: z.string().uuid().optional().or(z.literal("")),
   activo: z.coerce.boolean().optional(),
 });
 

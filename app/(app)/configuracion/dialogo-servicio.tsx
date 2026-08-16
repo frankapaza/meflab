@@ -31,16 +31,19 @@ export type ServicioEditable = {
   categoriaId: string | null;
   precioCapturado: number;
   afectacion: string;
+  flujoId: string | null;
   activo: boolean;
 };
 
 export type OpcionCategoria = { id: string; nombre: string };
+export type OpcionFlujo = { id: string; nombre: string; etapas: number };
 
 const NUEVA = "__nueva__";
 
 export function DialogoServicio({
   servicio,
   categorias,
+  flujos,
   capturaConIgv,
   listaDefecto,
   tasaIgv,
@@ -48,6 +51,7 @@ export function DialogoServicio({
 }: {
   servicio?: ServicioEditable;
   categorias: OpcionCategoria[];
+  flujos: OpcionFlujo[];
   capturaConIgv: boolean;
   listaDefecto: string;
   tasaIgv: number;
@@ -70,6 +74,7 @@ export function DialogoServicio({
     categoriaNueva: "",
     precio: String(precioInicial),
     afectacion: servicio?.afectacion ?? "gravado",
+    flujoId: servicio?.flujoId ?? "",
   });
   const set = (k: keyof typeof c, v: string) => setC((p) => ({ ...p, [k]: v }));
 
@@ -86,6 +91,7 @@ export function DialogoServicio({
   const valido = c.precio !== "" && Number.isFinite(tecleado) && tecleado >= 0;
   const almacenado = valido ? valorVentaAlmacenado(tecleado, capturaConIgv, tasaIgv) : null;
   const creandoCategoria = c.categoriaId === NUEVA;
+  const flujoElegido = flujos.find((f) => f.id === c.flujoId);
 
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
@@ -248,6 +254,39 @@ export function DialogoServicio({
               </select>
             </Campo>
           </fieldset>
+
+          {/* D-04: sin flujo, una orden con este servicio entra en
+              producción sin ninguna tarea. Es el error más caro de esta
+              pantalla, así que se dice aquí y no en una ayuda. */}
+          <Campo etiqueta="Flujo de producción" id={`${idForm}-flu`}>
+            <select
+              id={`${idForm}-flu`}
+              name="flujoId"
+              value={c.flujoId}
+              onChange={(e) => set("flujoId", e.target.value)}
+              className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s2 text-base outline-none focus-visible:border-acc"
+            >
+              <option value="">Sin flujo</option>
+              {flujos.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nombre} ({f.etapas} {f.etapas === 1 ? "etapa" : "etapas"})
+                </option>
+              ))}
+            </select>
+          </Campo>
+
+          {!c.flujoId ? (
+            <p className="rounded-r1 border border-warn bg-warn-bg px-s3 py-s2 text-sm leading-relaxed text-warn">
+              Sin flujo, una orden con este servicio entra en producción{" "}
+              <b className="font-semibold">sin ninguna tarea</b>: no aparece en
+              el tablero de nadie. Puedes dejarlo así y asignarlo después.
+            </p>
+          ) : flujoElegido?.etapas === 0 ? (
+            <p className="rounded-r1 border border-warn bg-warn-bg px-s3 py-s2 text-sm leading-relaxed text-warn">
+              Ese flujo no tiene etapas definidas todavía, así que tampoco
+              generará ninguna tarea.
+            </p>
+          ) : null}
 
           {estado.mensaje && !estado.ok ? (
             <p role="alert" className="rounded-r1 border border-err bg-err-bg px-s3 py-s2 text-sm text-err">

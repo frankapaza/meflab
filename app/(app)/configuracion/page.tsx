@@ -8,6 +8,7 @@ import { BotonActivoServicio } from "./boton-activo";
 import {
   DialogoServicio,
   type OpcionCategoria,
+  type OpcionFlujo,
   type ServicioEditable,
 } from "./dialogo-servicio";
 
@@ -27,6 +28,7 @@ type Fila = {
   precio_capturado: number;
   precio_base: number;
   afectacion: string;
+  flujo_id: string | null;
   activo: boolean;
   categoria: { nombre: string } | null;
 };
@@ -37,12 +39,17 @@ export default async function CatalogoPage() {
 
   const supabase = await crearClienteServidor();
 
-  const [{ data: servicios }, { data: categorias }, { data: listas }, { data: config }] =
-    await Promise.all([
+  const [
+    { data: servicios },
+    { data: categorias },
+    { data: listas },
+    { data: config },
+    { data: flujos },
+  ] = await Promise.all([
       supabase
         .from("servicio")
         .select(
-          "id, codigo, nombre, categoria_id, precio_capturado, precio_base, afectacion, activo, categoria:categoria_id(nombre)",
+          "id, codigo, nombre, categoria_id, precio_capturado, precio_base, afectacion, flujo_id, activo, categoria:categoria_id(nombre)",
         )
         .order("codigo"),
       supabase.from("categoria_servicio").select("id, nombre").order("orden"),
@@ -52,6 +59,11 @@ export default async function CatalogoPage() {
         .eq("activo", true)
         .order("nombre"),
       supabase.from("configuracion").select("valor").eq("clave", "igv").maybeSingle(),
+      supabase
+        .from("flujo_produccion")
+        .select("id, nombre, flujo_etapa(count)")
+        .eq("activo", true)
+        .order("nombre"),
     ]);
 
   const filas = (servicios ?? []) as unknown as Fila[];
@@ -62,8 +74,17 @@ export default async function CatalogoPage() {
   const tasaIgv = (config?.valor as { tasa?: number } | null)?.tasa ?? 0.18;
   const capturaConIgv = defecto?.precios_incluyen_igv ?? false;
 
+  const opcionesFlujo: OpcionFlujo[] = (flujos ?? []).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    etapas:
+      (f.flujo_etapa as unknown as { count: number }[] | null)?.[0]?.count ?? 0,
+  }));
+
   const puedeEditar = ctx.roles.includes("administrador");
   const activos = filas.filter((s) => s.activo).length;
+  // Es el fallo más caro del catálogo: se ve antes de abrir nada.
+  const sinFlujo = filas.filter((s) => s.activo && !s.flujo_id);
 
   return (
     <div className="flex flex-col gap-s4 p-s6">
@@ -78,6 +99,7 @@ export default async function CatalogoPage() {
         {puedeEditar && defecto ? (
           <DialogoServicio
             categorias={opciones}
+            flujos={opcionesFlujo}
             capturaConIgv={capturaConIgv}
             listaDefecto={defecto.nombre}
             tasaIgv={tasaIgv}
@@ -102,6 +124,22 @@ export default async function CatalogoPage() {
           conversión la hace la base al guardar — nunca al leer.
         </p>
       </div>
+
+      {sinFlujo.length > 0 ? (
+        <p className="rounded-r1 border border-warn bg-warn-bg px-s3 py-s2 text-sm leading-relaxed text-warn">
+          <b className="font-semibold">
+            {sinFlujo.length === 1
+              ? "Un servicio activo no tiene flujo de producción"
+              : `${sinFlujo.length} servicios activos no tienen flujo de producción`}
+          </b>{" "}
+          ({sinFlujo.map((s) => s.codigo).join(", ")}). Una orden que los use
+          entra en producción sin ninguna tarea y no aparece en el tablero.{" "}
+          <Link href="/configuracion/produccion" className="underline">
+            Ver flujos
+          </Link>
+          .
+        </p>
+      ) : null}
 
       {!defecto ? (
         <p className="rounded-r1 border border-warn bg-warn-bg px-s3 py-s2 text-sm text-warn">
@@ -163,6 +201,7 @@ export default async function CatalogoPage() {
                     categoriaId: s.categoria_id,
                     precioCapturado: s.precio_capturado,
                     afectacion: s.afectacion,
+                    flujoId: s.flujo_id,
                     activo: s.activo,
                   };
 
@@ -181,6 +220,11 @@ export default async function CatalogoPage() {
                           {s.afectacion !== "gravado" ? (
                             <span className="font-mono text-xs uppercase text-warn">
                               {s.afectacion}
+                            </span>
+                          ) : null}
+                          {s.activo && !s.flujo_id ? (
+                            <span className="font-mono text-xs uppercase text-warn">
+                              ▲ sin flujo de producción
                             </span>
                           ) : null}
                           {!s.activo ? (
@@ -213,6 +257,7 @@ export default async function CatalogoPage() {
                             <DialogoServicio
                               servicio={editable}
                               categorias={opciones}
+                              flujos={opcionesFlujo}
                               capturaConIgv={capturaConIgv}
                               listaDefecto={defecto.nombre}
                               tasaIgv={tasaIgv}

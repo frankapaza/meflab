@@ -1711,6 +1711,10 @@ export type Database = {
         Args: { p_numero: string; p_tipo: string }
         Returns: boolean
       }
+      fijar_etapas_flujo: {
+        Args: { p_flujo: string; p_procesos: string[] }
+        Returns: number
+      }
       generar_codigo_orden: { Args: { p_tenant: string }; Returns: string }
       instanciar_etapas: { Args: { p_orden: string }; Returns: number }
       jwt_claims: { Args: never; Returns: Json }

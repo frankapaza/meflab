@@ -587,6 +587,54 @@ begin
 
   raise notice 'OK 13 · siempre hay una lista por defecto, y esta activa';
 
+  -- ── 14 · D-04 · reordenar etapas sin chocar ni vaciar el flujo ──────
+  -- `unique (flujo_id, orden)` hace que intercambiar la 2 y la 3 fila a
+  -- fila choque a mitad de camino, y borrarlas todas desde la aplicacion
+  -- deja el flujo VACIO si la reinsercion falla. Un flujo vacio mete las
+  -- ordenes en produccion sin ninguna tarea.
+  n := fijar_etapas_flujo(
+    '99999999-0000-0000-0000-000000000001',
+    array[
+      '88888888-0000-0000-0000-000000000003',
+      '88888888-0000-0000-0000-000000000001',
+      '88888888-0000-0000-0000-000000000002'
+    ]::uuid[]
+  );
+  if n <> 3 then
+    raise exception 'fijar_etapas_flujo deberia dejar 3 etapas, dejo %', n;
+  end if;
+
+  select string_agg(p.codigo, '>' order by fe.orden) into v_codigo
+    from flujo_etapa fe join proceso p on p.id = fe.proceso_id
+   where fe.flujo_id = '99999999-0000-0000-0000-000000000001';
+  if v_codigo <> 'ACABADO>MODELO>CAD' then
+    raise exception 'La secuencia quedo como "%", esperaba ACABADO>MODELO>CAD', v_codigo;
+  end if;
+
+  -- Un mismo proceso puede repetirse: hay trabajos con dos pruebas en
+  -- clinica, y cada una es una etapa que se registra aparte.
+  n := fijar_etapas_flujo(
+    '99999999-0000-0000-0000-000000000001',
+    array[
+      '88888888-0000-0000-0000-000000000001',
+      '88888888-0000-0000-0000-000000000002',
+      '88888888-0000-0000-0000-000000000002',
+      '88888888-0000-0000-0000-000000000003'
+    ]::uuid[]
+  );
+  if n <> 4 then
+    raise exception 'Un proceso repetido deberia contar como dos etapas, conto %', n;
+  end if;
+
+  -- Y las ordenes YA instanciadas no se tocan: las etapas se copian al
+  -- registrar la orden, no se leen del flujo cada vez.
+  select count(*) into n from tarea_produccion where orden_id = v_orden;
+  if n <> 3 then
+    raise exception 'Cambiar el flujo movio las tareas de una orden en curso (% tareas)', n;
+  end if;
+
+  raise notice 'OK 14 · D-04 · la secuencia se reescribe entera y no toca lo ya instanciado';
+
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -594,4 +642,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 20 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 21 comprobaciones pasan'
