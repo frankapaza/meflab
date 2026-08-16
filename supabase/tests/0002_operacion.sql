@@ -71,6 +71,7 @@ declare
   n int;
   v_codigo text;
   v_orden uuid;
+  v_orden_2 uuid;
   v_doctor_ind uuid;
   v_doc text;
   v_ruido int;
@@ -635,6 +636,98 @@ begin
 
   raise notice 'OK 14 · D-04 · la secuencia se reescribe entera y no toca lo ya instanciado';
 
+  -- ── 15 · el alta de una orden es una sola transaccion ───────────────
+  -- Un cliente SIN lista asignada se cobra al precio base del catalogo,
+  -- que la prueba 12b dejo en 680.00.
+  insert into cliente (id, tenant_id, tipo, razon_social, numero_documento)
+  values ('55555555-0000-0000-0000-000000000009', '11111111-0000-0000-0000-000000000001',
+          'clinica', 'Otra Clinica', '20100047218');
+
+  v_precio := precio_para_cliente(
+    '55555555-0000-0000-0000-000000000009', 'aaaa0000-0000-0000-0000-000000000001');
+  if v_precio <> 680.00 then
+    raise exception 'Sin lista deberia mandar el precio base (680.00), dio %', v_precio;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    '{"tenant_id":"11111111-0000-0000-0000-000000000001","roles":["recepcion"]}',
+    true
+  );
+
+  -- El precio NO viaja desde el formulario: se resuelve contra la lista
+  -- del cliente. Esta clinica tiene "Lista base", que en la prueba 12 fijo
+  -- 660.80 para COR-ZIR, asi que la lista manda sobre el catalogo.
+  select registrar_orden(
+    p_cliente            => '55555555-0000-0000-0000-000000000001',
+    p_doctor             => '66666666-0000-0000-0000-000000000001',
+    p_paciente           => '77777777-0000-0000-0000-000000000001',
+    p_fecha_comprometida => current_date + 10,
+    p_lineas             => jsonb_build_array(jsonb_build_object(
+      'servicio_id', 'aaaa0000-0000-0000-0000-000000000001',
+      'cantidad', 2,
+      'piezas_fdi', jsonb_build_array('16','26')
+    ))
+  ) into v_orden_2;
+
+  select precio_unitario into v_precio from detalle_trabajo where orden_id = v_orden_2;
+  if v_precio <> 660.80 then
+    raise exception 'El precio de la lista deberia mandar (660.80), salio %', v_precio;
+  end if;
+
+  -- Y con las cuatro escrituras hechas: cabecera, linea, correlativo y
+  -- tareas. El flujo tiene 4 etapas tras la prueba 14.
+  select count(*) into n from tarea_produccion where orden_id = v_orden_2;
+  if n <> 4 then
+    raise exception 'La orden deberia nacer con 4 tareas, nacio con %', n;
+  end if;
+
+  select codigo into v_codigo from orden_trabajo where id = v_orden_2;
+  if v_codigo !~ '^OT-\d{4}-\d{6}$' then
+    raise exception 'La orden nacio sin codigo valido: "%"', v_codigo;
+  end if;
+
+  raise notice 'OK 15 · la orden nace entera: cabecera, lineas, codigo y tareas';
+
+  -- ── 15b · una orden rota no llega a existir ─────────────────────────
+  begin
+    perform registrar_orden(
+      p_cliente            => '55555555-0000-0000-0000-000000000001',
+      p_doctor             => '66666666-0000-0000-0000-000000000001',
+      p_paciente           => '77777777-0000-0000-0000-000000000001',
+      p_fecha_comprometida => current_date + 10,
+      p_lineas             => '[]'::jsonb
+    );
+    raise exception 'La base acepto una orden sin ningun trabajo';
+  exception
+    when check_violation then null;
+  end;
+
+  -- D-01: la factura no puede salir a nombre de quien no pidio el trabajo.
+  begin
+    perform registrar_orden(
+      p_cliente            => '55555555-0000-0000-0000-000000000009',
+      p_doctor             => '66666666-0000-0000-0000-000000000001',
+      p_paciente           => '77777777-0000-0000-0000-000000000001',
+      p_fecha_comprometida => current_date + 10,
+      p_lineas             => jsonb_build_array(jsonb_build_object(
+        'servicio_id', 'aaaa0000-0000-0000-0000-000000000001'))
+    );
+    raise exception 'La base acepto un doctor que no pertenece al cliente';
+  exception
+    when check_violation then null;
+  end;
+
+  select count(*) into n from orden_trabajo
+   where cliente_id = '55555555-0000-0000-0000-000000000009';
+  if n <> 0 then
+    raise exception 'Un alta fallida dejo % cabecera(s) huerfana(s)', n;
+  end if;
+
+  raise notice 'OK 15b · una orden sin trabajos o con doctor ajeno no llega a existir';
+
+  perform set_config('request.jwt.claims', '', true);
+
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -642,4 +735,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 21 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 23 comprobaciones pasan'

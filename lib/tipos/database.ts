@@ -1727,6 +1727,10 @@ export type Database = {
         Args: { p_fila: Json; p_relid: unknown }
         Returns: string
       }
+      precio_para_cliente: {
+        Args: { p_cliente: string; p_servicio: string }
+        Returns: number
+      }
       registrar_doctor_independiente: {
         Args: {
           p_colegiatura?: string
@@ -1740,6 +1744,20 @@ export type Database = {
           p_sede_entrega?: string
           p_telefono?: string
           p_tipo_documento: string
+        }
+        Returns: string
+      }
+      registrar_orden: {
+        Args: {
+          p_cliente: string
+          p_doctor: string
+          p_fecha_comprometida: string
+          p_indicaciones?: string
+          p_lineas: Json
+          p_paciente: string
+          p_prioridad?: string
+          p_sede?: string
+          p_tipo_recepcion?: string
         }
         Returns: string
       }

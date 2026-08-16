@@ -36,6 +36,7 @@ const REGLAS: Record<string, readonly string[]> = {
 
   // Producción
   "/trabajos": INTERNOS,
+  "/trabajos/nueva": ["administrador", "recepcion"],
   "/produccion": ["administrador", "gerencia", "lider_laboratorio", "lider_area", "tecnico"],
   "/produccion/mis-tareas": ["administrador", "lider_area", "tecnico"],
   "/entregas": ["administrador", "gerencia", "lider_laboratorio", "recepcion", "lider_area"],

@@ -1141,7 +1141,153 @@ $$;
 comment on function public.fijar_etapas_flujo is
   'Reescribe la secuencia de etapas de un flujo de una vez. Atómico: un fallo no deja el flujo vacío.';
 
--- ── 14 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
+-- ── 14 · PRECIO QUE LE TOCA A UN CLIENTE ──────────────────────────────
+-- La jerarquía es: precio de su lista → precio base del catálogo. Vive en
+-- la base porque es la cifra que acaba en el comprobante: si la calculara
+-- la aplicación, cualquier pantalla nueva podría resolverla de otra forma
+-- y el mismo doctor vería dos precios para el mismo trabajo — que es la
+-- forma en que empezó H-01.
+create or replace function public.precio_para_cliente(
+  p_cliente  uuid,
+  p_servicio uuid
+)
+returns numeric
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(
+    (select i.precio
+       from public.cliente c
+       join public.lista_precio_item i
+         on i.lista_precio_id = c.lista_precio_id
+        and i.servicio_id = p_servicio
+      where c.id = p_cliente),
+    (select s.precio_base from public.servicio s where s.id = p_servicio)
+  );
+$$;
+
+comment on function public.precio_para_cliente is
+  'Valor de venta sin IGV que le toca a un cliente por un servicio: el de su lista, o el base. Una sola fuente.';
+
+-- ── 15 · ALTA DE UNA ORDEN DE TRABAJO ─────────────────────────────────
+-- Una orden son cuatro escrituras que sólo valen juntas: la cabecera, sus
+-- líneas de venta, el correlativo y las tareas de producción. A medias no
+-- es media orden — es una orden rota:
+--
+--   · cabecera sin líneas → un trabajo que no se puede cobrar
+--   · líneas sin tareas   → un trabajo que nadie va a fabricar
+--   · correlativo quemado → un hueco en la numeración, que RF-095 prohíbe
+--
+-- security invoker: RLS sigue aplicando, esto no es una puerta trasera.
+create or replace function public.registrar_orden(
+  p_cliente            uuid,
+  p_doctor             uuid,
+  p_paciente           uuid,
+  p_fecha_comprometida date,
+  p_lineas             jsonb,
+  p_prioridad          text default 'normal',
+  p_tipo_recepcion     text default 'impresion_fisica',
+  p_indicaciones       text default null,
+  p_sede               uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_tenant  uuid := public.current_tenant_id();
+  v_estado  uuid;
+  v_orden   uuid;
+  v_linea   jsonb;
+  v_precio  numeric(12,2);
+begin
+  if v_tenant is null then
+    raise exception 'Sin sesión válida' using errcode = '42501';
+  end if;
+
+  if jsonb_array_length(coalesce(p_lineas, '[]'::jsonb)) = 0 then
+    raise exception 'Una orden sin trabajos no es una orden'
+      using errcode = '23514';
+  end if;
+
+  -- D-01: el doctor pide, el cliente paga. Si no se corresponden, la
+  -- factura saldría a nombre de quien no pidió el trabajo.
+  if not exists (
+    select 1 from public.doctor d
+     where d.id = p_doctor and d.cliente_id = p_cliente
+  ) then
+    raise exception 'Ese doctor no pertenece a ese cliente'
+      using errcode = '23514';
+  end if;
+
+  if exists (select 1 from public.cliente c where c.id = p_cliente and c.bloqueado) then
+    raise exception 'El cliente está bloqueado comercialmente'
+      using errcode = '23514';
+  end if;
+
+  -- El primer estado del ciclo, sea cual sea el nombre que le haya puesto
+  -- el laboratorio: lo que fija el sitio es la fase canónica (M-01).
+  select id into v_estado
+    from public.estado_trabajo
+   where tenant_id = v_tenant and fase = 'inicial' and activo
+   order by orden
+   limit 1;
+
+  if v_estado is null then
+    raise exception 'El laboratorio no tiene un estado inicial configurado';
+  end if;
+
+  insert into public.orden_trabajo (
+    tenant_id, sede_id, codigo, cliente_id, doctor_id, paciente_id, estado_id,
+    prioridad, tipo_recepcion, fecha_comprometida, indicaciones, created_by
+  ) values (
+    v_tenant, p_sede, public.generar_codigo_orden(v_tenant),
+    p_cliente, p_doctor, p_paciente, v_estado,
+    coalesce(p_prioridad, 'normal')::public.prioridad_trabajo,
+    coalesce(p_tipo_recepcion, 'impresion_fisica')::public.tipo_recepcion,
+    p_fecha_comprometida, nullif(btrim(coalesce(p_indicaciones, '')), ''), auth.uid()
+  )
+  returning id into v_orden;
+
+  for v_linea in select * from jsonb_array_elements(p_lineas)
+  loop
+    -- El precio NO llega del navegador. Se resuelve aquí, contra la lista
+    -- del cliente: mandarlo desde el formulario dejaría el importe a
+    -- merced de lo que tuviera la pantalla en ese momento.
+    v_precio := public.precio_para_cliente(p_cliente, (v_linea ->> 'servicio_id')::uuid);
+
+    insert into public.detalle_trabajo (
+      tenant_id, orden_id, servicio_id, cantidad, precio_unitario,
+      afectacion, piezas_fdi, color_id, arcada, created_by
+    )
+    select
+      v_tenant, v_orden, s.id,
+      coalesce((v_linea ->> 'cantidad')::numeric, 1),
+      v_precio,
+      s.afectacion,
+      coalesce(
+        array(select jsonb_array_elements_text(v_linea -> 'piezas_fdi')),
+        '{}'::text[]
+      ),
+      nullif(v_linea ->> 'color_id', '')::uuid,
+      nullif(btrim(coalesce(v_linea ->> 'arcada', '')), ''),
+      auth.uid()
+    from public.servicio s
+    where s.id = (v_linea ->> 'servicio_id')::uuid;
+  end loop;
+
+  perform public.instanciar_etapas(v_orden);
+
+  return v_orden;
+end;
+$$;
+
+comment on function public.registrar_orden is
+  'Cabecera + líneas + correlativo + tareas en una sola transacción. A medias no es media orden, es una orden rota.';
+
+-- ── 16 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
 -- El paciente es la única persona del sistema que no es cliente nuestro y
 -- que no ha consentido nada: llega en la orden de su odontólogo. El
 -- técnico necesita saber PARA QUIÉN es el trabajo, no quién es.
