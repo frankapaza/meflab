@@ -48,14 +48,14 @@ const ESTADOS = [
 ] as const;
 
 const ESCALA = [
-  ["text-8", "32 px", "S/ 84,320"],
-  ["text-7", "26 px", "S/ 84,320"],
-  ["text-6", "20 px", "Título de pantalla"],
-  ["text-5", "16 px", "Subtítulo"],
-  ["text-4", "14 px", "Título de tarjeta"],
-  ["text-3", "13 px", "Cuerpo del texto"],
-  ["text-2", "12 px", "Secundario"],
-  ["text-1", "11 px", "Etiqueta · piso de la escala"],
+  ["text-4xl", "32 px", "S/ 84,320"],
+  ["text-3xl", "26 px", "S/ 84,320"],
+  ["text-2xl", "20 px", "Título de pantalla"],
+  ["text-xl", "16 px", "Subtítulo"],
+  ["text-lg", "14 px", "Título de tarjeta"],
+  ["text-base", "13 px", "Cuerpo del texto"],
+  ["text-sm", "12 px", "Secundario"],
+  ["text-xs", "11 px", "Etiqueta · piso de la escala"],
 ] as const;
 
 const DENSIDADES = ["dz-compacto", "dz-normal", "dz-amplio"] as const;
@@ -75,11 +75,11 @@ export default function TokensPage() {
   return (
     <div className={`${dz} min-h-screen bg-bg text-ink`}>
         <header className="flex flex-wrap items-center gap-s3 border-b border-line bg-card px-s6 py-s4">
-          <h1 className="text-6 font-semibold tracking-tight">Tokens del sistema de diseño</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Tokens del sistema de diseño</h1>
           <div className="flex-1" />
           <button
             onClick={() => setDark((v) => !v)}
-            className="h-tap rounded-r1 border border-line bg-card-2 px-s3 font-mono text-1 text-ink-2 hover:bg-fill"
+            className="h-tap rounded-r1 border border-line bg-card-2 px-s3 font-mono text-xs text-ink-2 hover:bg-fill"
           >
             {dark ? "CLARO" : "OSCURO"}
           </button>
@@ -88,7 +88,7 @@ export default function TokensPage() {
               <button
                 key={d}
                 onClick={() => setDz(d)}
-                className={`h-tap px-s3 font-mono text-1 ${
+                className={`h-tap px-s3 font-mono text-xs ${
                   dz === d ? "bg-acc text-acc-on" : "bg-card-2 text-ink-2 hover:bg-fill"
                 }`}
               >
@@ -109,9 +109,9 @@ export default function TokensPage() {
 
           <Panel titulo="Texto" meta="contraste medido sobre --card, todos ≥ 4.5:1">
             <div className="flex flex-col gap-s2">
-              <p className="text-3 text-ink">Primario · --ink · 17.6:1</p>
-              <p className="text-3 text-ink-2">Secundario · --ink-2 · 5.9:1</p>
-              <p className="text-3 text-ink-3">Terciario · --ink-3 · 4.7:1</p>
+              <p className="text-base text-ink">Primario · --ink · 17.6:1</p>
+              <p className="text-base text-ink-2">Secundario · --ink-2 · 5.9:1</p>
+              <p className="text-base text-ink-3">Terciario · --ink-3 · 4.7:1</p>
             </div>
           </Panel>
 
@@ -128,7 +128,7 @@ export default function TokensPage() {
               {ESTADOS.map(([glifo, cls, nombre]) => (
                 <span
                   key={nombre}
-                  className="inline-flex items-center gap-s2 rounded-r1 bg-fill px-s3 py-s2 text-1 text-ink-2"
+                  className="inline-flex items-center gap-s2 rounded-r1 bg-fill px-s3 py-s2 text-xs text-ink-2"
                 >
                   <span className={`inline-block size-[10px] rounded-full ${cls}`} />
                   <span className="font-mono">{glifo}</span>
@@ -143,7 +143,7 @@ export default function TokensPage() {
               {ESCALA.map(([cls, px, txt]) => (
                 <div key={cls} className="flex items-baseline gap-s4 border-b border-line pb-s2">
                   <span className={`${cls} flex-1 font-semibold tracking-tight`}>{txt}</span>
-                  <span className="font-mono text-1 text-ink-3">
+                  <span className="font-mono text-xs text-ink-3">
                     {cls} · {px}
                   </span>
                 </div>
@@ -156,20 +156,20 @@ export default function TokensPage() {
               {(["rounded-r1", "rounded-r2", "rounded-r3"] as const).map((r) => (
                 <div key={r} className="flex flex-col items-center gap-s2">
                   <div className={`size-[72px] border border-line-2 bg-card-2 ${r}`} />
-                  <span className="font-mono text-1 text-ink-3">{r}</span>
+                  <span className="font-mono text-xs text-ink-3">{r}</span>
                 </div>
               ))}
               {(["shadow-e1", "shadow-e2", "shadow-e3"] as const).map((s) => (
                 <div key={s} className="flex flex-col items-center gap-s2">
                   <div className={`size-[72px] rounded-r2 bg-card ${s}`} />
-                  <span className="font-mono text-1 text-ink-3">{s}</span>
+                  <span className="font-mono text-xs text-ink-3">{s}</span>
                 </div>
               ))}
               <div className="flex flex-col items-center gap-s2">
-                <button className="h-tap rounded-r1 bg-acc px-s4 text-2 font-semibold text-acc-on">
+                <button className="h-tap rounded-r1 bg-acc px-s4 text-sm font-semibold text-acc-on">
                   Objetivo táctil
                 </button>
-                <span className="font-mono text-1 text-ink-3">h-tap</span>
+                <span className="font-mono text-xs text-ink-3">h-tap</span>
               </div>
             </div>
           </Panel>
@@ -178,8 +178,8 @@ export default function TokensPage() {
             <div className="flex flex-col gap-s2">
               {["S/ 1,675.60", "S/ 84,320.00", "S/ 6,145.60", "S/ 980.00"].map((v) => (
                 <div key={v} className="flex justify-between border-b border-line pb-s1">
-                  <span className="text-2 text-ink-2">Importe</span>
-                  <span className="num text-3 font-medium">{v}</span>
+                  <span className="text-sm text-ink-2">Importe</span>
+                  <span className="num text-base font-medium">{v}</span>
                 </div>
               ))}
             </div>
@@ -201,8 +201,8 @@ function Panel({
   return (
     <section className="overflow-hidden rounded-r2 border border-line bg-card shadow-e1">
       <div className="flex flex-wrap items-center justify-between gap-s3 border-b border-line bg-card-2 px-pad-x py-s3">
-        <h2 className="text-2 font-semibold uppercase tracking-wide text-ink-2">{titulo}</h2>
-        {meta ? <span className="font-mono text-1 text-ink-3">{meta}</span> : null}
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-2">{titulo}</h2>
+        {meta ? <span className="font-mono text-xs text-ink-3">{meta}</span> : null}
       </div>
       <div className="px-pad-x py-s4">{children}</div>
     </section>
@@ -213,8 +213,8 @@ function Muestra({ cls, tok, nombre }: { cls: string; tok: string; nombre: strin
   return (
     <div className="flex w-[126px] flex-col gap-s1">
       <span className={`h-[46px] rounded-r1 ring-1 ring-inset ring-line-2 ${cls}`} />
-      <span className="text-2 font-medium">{nombre}</span>
-      <span className="font-mono text-1 text-ink-3">{tok}</span>
+      <span className="text-sm font-medium">{nombre}</span>
+      <span className="font-mono text-xs text-ink-3">{tok}</span>
     </div>
   );
 }
