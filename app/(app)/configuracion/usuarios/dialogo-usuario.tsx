@@ -34,8 +34,26 @@ export function DialogoUsuario({
 }) {
   const editando = Boolean(usuario);
   const [abierto, setAbierto] = useState(false);
-  const [roles, setRoles] = useState<string[]>(usuario?.roles ?? []);
   const idForm = useId();
+
+  /**
+   * Campos CONTROLADOS, no `defaultValue`.
+   *
+   * React reinicia el formulario después de ejecutar una acción. Con
+   * campos no controlados, un alta fallida borra todo lo tecleado y hay
+   * que empezar de cero. Se detectó probando en el diálogo de clientes.
+   */
+  const [campos, setCampos] = useState(() => ({
+    nombre: usuario?.nombre ?? "",
+    email: "",
+    password: "",
+    telefono: usuario?.telefono ?? "",
+    roles: usuario?.roles ?? ([] as string[]),
+  }));
+  const set = (k: string, v: string) => setCampos((c) => ({ ...c, [k]: v }));
+  const roles = campos.roles;
+  const setRoles = (fn: (r: string[]) => string[]) =>
+    setCampos((c) => ({ ...c, roles: fn(c.roles) }));
 
   // El cierre se decide DENTRO de la acción, no en un efecto que observe
   // el resultado: eso último dispara renders en cascada y React lo avisa.
@@ -51,7 +69,9 @@ export function DialogoUsuario({
       );
       if (resultado.ok) {
         setAbierto(false);
-        if (!editando) setRoles([]);
+        if (!editando) {
+          setCampos({ nombre: "", email: "", password: "", telefono: "", roles: [] });
+        }
       }
       return resultado;
     },
@@ -86,7 +106,8 @@ export function DialogoUsuario({
               name="nombre"
               required
               minLength={3}
-              defaultValue={usuario?.nombre}
+              value={campos.nombre}
+              onChange={(e) => set("nombre", e.target.value)}
               className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s3 text-base outline-none focus-visible:border-acc"
             />
           </Campo>
@@ -104,6 +125,8 @@ export function DialogoUsuario({
                 name="email"
                 type="email"
                 required
+                value={campos.email}
+                onChange={(e) => set("email", e.target.value)}
                 className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s3 text-base outline-none focus-visible:border-acc"
               />
             </Campo>
@@ -122,6 +145,8 @@ export function DialogoUsuario({
                 required
                 minLength={10}
                 autoComplete="new-password"
+                value={campos.password}
+                onChange={(e) => set("password", e.target.value)}
                 className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s3 font-mono text-base outline-none focus-visible:border-acc"
               />
             </Campo>
@@ -131,7 +156,8 @@ export function DialogoUsuario({
             <input
               id={`${idForm}-tel`}
               name="telefono"
-              defaultValue={usuario?.telefono ?? ""}
+              value={campos.telefono}
+              onChange={(e) => set("telefono", e.target.value)}
               className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s3 text-base outline-none focus-visible:border-acc"
             />
           </Campo>

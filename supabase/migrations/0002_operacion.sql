@@ -733,3 +733,60 @@ comment on table public.precio_historial is
 -- arriba acaba de volver a conceder escritura sobre las bitácoras que las
 -- migraciones anteriores habían cerrado. Esto lo deshace.
 select public.asegurar_append_only();
+
+-- ── 11 · VALIDACIÓN DE DOCUMENTO EN LA BASE ───────────────────────────
+-- Regla 7 de CLAUDE.md: la regla vive en la base primero. Un RUC mal
+-- tecleado no se detecta al emitir la factura —con el doctor esperando y
+-- SUNAT rechazándola— sino al registrar el cliente.
+--
+-- Módulo 11: los 10 primeros dígitos por los factores 5,4,3,2,7,6,5,4,3,2;
+-- 11 menos el resto entre 11, colapsando 10→0 y 11→1.
+create or replace function public.ruc_valido(p_ruc text)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  factores int[] := array[5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  suma int := 0;
+  verificador int;
+begin
+  -- Los dos primeros dígitos declaran el tipo de contribuyente.
+  if p_ruc !~ '^(10|15|17|20)[0-9]{9}$' then
+    return false;
+  end if;
+
+  for i in 1..10 loop
+    suma := suma + (substring(p_ruc from i for 1))::int * factores[i];
+  end loop;
+
+  verificador := 11 - (suma % 11);
+  if verificador = 10 then verificador := 0; end if;
+  if verificador = 11 then verificador := 1; end if;
+
+  return verificador = (substring(p_ruc from 11 for 1))::int;
+end;
+$$;
+
+comment on function public.ruc_valido is
+  'Dígito verificador módulo 11 de SUNAT. Espeja lib/validaciones/documento.ts: si una cambia, la otra también.';
+
+create or replace function public.documento_valido(p_tipo text, p_numero text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_tipo
+    when 'RUC' then public.ruc_valido(p_numero)
+    when 'DNI' then p_numero ~ '^[0-9]{8}$' and p_numero <> '00000000'
+    -- Carné y pasaporte no tienen formato fijo verificable: exigirles uno
+    -- inventado bloquearía clientes legítimos.
+    else length(trim(p_numero)) >= 6
+  end;
+$$;
+
+alter table public.cliente
+  add constraint cliente_documento_valido
+  check (public.documento_valido(tipo_documento, numero_documento));

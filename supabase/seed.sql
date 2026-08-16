@@ -8,7 +8,7 @@
 
 -- ── laboratorio ───────────────────────────────────────────────────────
 insert into public.tenant (id, nombre, ruc) values
-  ('a0000000-0000-4000-8000-000000000001', 'Laboratorio Dental Vera', '20512345678');
+  ('a0000000-0000-4000-8000-000000000001', 'Laboratorio Dental Vera', '20512345671');
 
 insert into public.sede (id, tenant_id, codigo, nombre, direccion) values
   ('a0000000-0000-4000-8000-000000000010', 'a0000000-0000-4000-8000-000000000001',

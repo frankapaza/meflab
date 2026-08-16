@@ -30,7 +30,7 @@ values ('44444444-0000-0000-0000-000000000001', '11111111-0000-0000-0000-0000000
 
 insert into cliente (id, tenant_id, tipo, razon_social, numero_documento, lista_precio_id)
 values ('55555555-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001',
-        'clinica', 'Clínica Dental Sonrisa Plena', '20512345678',
+        'clinica', 'Clínica Dental Sonrisa Plena', '20512345671',
         '44444444-0000-0000-0000-000000000001');
 
 insert into doctor (id, tenant_id, cliente_id, nombre)
@@ -203,6 +203,29 @@ begin
 
   raise notice 'OK 8 · el historial de estados lo escribe el trigger';
 
+  -- ── 8b · el RUC se valida EN LA BASE, no solo en el formulario ──────
+  -- Un RUC mal tecleado llega hasta el comprobante electronico y SUNAT lo
+  -- rechaza. Detectarlo aqui cuesta nada.
+  if not ruc_valido('20512345671') then
+    raise exception 'ruc_valido rechaza un RUC correcto';
+  end if;
+  if ruc_valido('20512345678') then
+    raise exception 'ruc_valido acepta un digito verificador incorrecto';
+  end if;
+  if ruc_valido('30512345671') then
+    raise exception 'ruc_valido acepta un prefijo que no existe';
+  end if;
+
+  begin
+    insert into cliente (tenant_id, tipo, razon_social, numero_documento)
+    values ('11111111-0000-0000-0000-000000000001', 'clinica', 'Clinica Falsa', '20512345678');
+    raise exception 'La base acepto un cliente con RUC invalido';
+  exception
+    when check_violation then null;
+  end;
+
+  raise notice 'OK 8b · el RUC se valida en la base, con su digito verificador';
+
   -- ── 9 · ninguna tabla @append-only conserva permiso de escritura ────
   -- Guarda contra la regresión que ya ocurrió una vez: un
   -- `grant ... on all tables` en una migración posterior reabrió el
@@ -229,4 +252,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 9 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 10 comprobaciones pasan'
