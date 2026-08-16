@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // El prototipo no es código del proyecto: `support.js` es el runtime de
     // Claude Design, generado y vendorizado, y el .dc.html no es React.
     "docs/**",
+    // El CLI de Supabase vendoriza aquí el runtime de edge functions.
+    "supabase/.temp/**",
   ]),
 ]);
 
