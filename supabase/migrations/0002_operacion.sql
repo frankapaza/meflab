@@ -476,6 +476,25 @@ $$;
 comment on function public.normalizar_valor_venta is
   'S/ 660.80 capturado con IGV incluido → S/ 560.00 almacenado. Redondeo a 2 decimales por línea (D-03).';
 
+-- La tasa vigente del laboratorio. Vive en configuracion porque cambia
+-- por ley, no por código: en Perú ya pasó del 19 % al 18 %.
+create or replace function public.tasa_igv(p_tenant uuid)
+returns numeric
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(
+    (select (valor ->> 'tasa')::numeric
+       from public.configuracion
+      where tenant_id = p_tenant and clave = 'igv'),
+    0.18
+  );
+$$;
+
+comment on function public.tasa_igv is
+  'Tasa de IGV del laboratorio, de configuracion. 0.18 si no está configurada.';
+
 -- RF-095: correlativos sin salto. El lock de fila serializa a los
 -- solicitantes concurrentes; emitir dos documentos a la vez no puede
 -- producir el mismo número.
@@ -608,6 +627,115 @@ $$;
 create trigger orden_trabajo_historial
   after insert or update of estado_id on public.orden_trabajo
   for each row execute function public.tg_orden_historial_estado();
+
+-- D-07 · la normalización ocurre AQUÍ, al guardar, y en ningún otro sitio.
+--
+-- Lo que se almacena es siempre valor de venta sin IGV (regla 5). Lo que
+-- cambia es cómo lo teclea el laboratorio: hay listas pactadas con el
+-- precio "a todo costo" y listas pactadas sin IGV, y obligar a convertir
+-- a mano garantiza que tarde o temprano alguien guarde 660.80 donde
+-- debían ir 560.00.
+--
+-- Va en un trigger y no en la Server Action porque un precio mal
+-- normalizado no se nota: no falla nada, simplemente el laboratorio cobra
+-- un 18 % de menos durante meses.
+--
+-- El precio base del servicio es el de la lista por defecto: es la que se
+-- aplica a un cliente que no tiene ninguna asignada.
+create or replace function public.tg_normalizar_precio()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_incluye boolean;
+begin
+  if tg_table_name = 'servicio' then
+    select l.precios_incluyen_igv into v_incluye
+      from public.lista_precio l
+     where l.tenant_id = new.tenant_id and l.es_default;
+
+    new.precio_base := public.normalizar_valor_venta(
+      new.precio_base, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
+    );
+  else
+    select l.precios_incluyen_igv into v_incluye
+      from public.lista_precio l
+     where l.id = new.lista_precio_id;
+
+    new.precio := public.normalizar_valor_venta(
+      new.precio, coalesce(v_incluye, false), public.tasa_igv(new.tenant_id)
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger servicio_normalizar_precio
+  before insert or update of precio_base on public.servicio
+  for each row execute function public.tg_normalizar_precio();
+
+create trigger lista_precio_item_normalizar
+  before insert or update of precio on public.lista_precio_item
+  for each row execute function public.tg_normalizar_precio();
+
+-- Todo cambio de precio deja rastro, con autor y fecha.
+--
+-- Sin esto, subir una tarifa es indistinguible de un dedazo: el precio
+-- nuevo simplemente sustituye al viejo y nadie puede responder "¿desde
+-- cuándo cuesta esto?" — que es la pregunta que llega cuando un doctor
+-- reclama una factura.
+--
+-- security definer por lo mismo que el historial de estados:
+-- precio_historial es @append-only y `authenticated` no tiene INSERT.
+create or replace function public.tg_precio_historial()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_antes    numeric(12,2);
+  v_despues  numeric(12,2);
+  v_servicio uuid;
+  v_lista    uuid;
+begin
+  if tg_table_name = 'servicio' then
+    v_servicio := new.id;
+    v_lista    := null;
+    v_antes    := case when tg_op = 'UPDATE' then old.precio_base end;
+    v_despues  := new.precio_base;
+  else
+    v_servicio := new.servicio_id;
+    v_lista    := new.lista_precio_id;
+    v_antes    := case when tg_op = 'UPDATE' then old.precio end;
+    v_despues  := new.precio;
+  end if;
+
+  -- Un update que no toca el precio no es un cambio de precio.
+  if tg_op = 'UPDATE' and v_antes is not distinct from v_despues then
+    return new;
+  end if;
+
+  insert into public.precio_historial (
+    tenant_id, servicio_id, lista_precio_id,
+    precio_antes, precio_despues, cambiado_por
+  ) values (
+    new.tenant_id, v_servicio, v_lista, v_antes, v_despues, auth.uid()
+  );
+
+  return new;
+end;
+$$;
+
+create trigger servicio_precio_historial
+  after insert or update of precio_base on public.servicio
+  for each row execute function public.tg_precio_historial();
+
+create trigger lista_precio_item_historial
+  after insert or update of precio on public.lista_precio_item
+  for each row execute function public.tg_precio_historial();
 
 do $$
 declare t text;

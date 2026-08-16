@@ -73,6 +73,7 @@ declare
   v_orden uuid;
   v_doctor_ind uuid;
   v_doc text;
+  v_ruido int;
   v_precio numeric;
 begin
   -- ── 1 · D-07 · la captura con IGV se normaliza a valor de venta ─────
@@ -407,6 +408,76 @@ begin
 
   raise notice 'OK 11b · RN-002 · el paciente sin documento se declara simplificado';
 
+  -- ── 12 · D-07 · la normalizacion ocurre AL GUARDAR, no al leer ──────
+  -- El servicio de montaje se creo con 620.00 y la lista por defecto
+  -- captura SIN IGV: tiene que haberse quedado igual.
+  select precio_base into v_precio from servicio
+   where id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 620.00 then
+    raise exception 'D-07 ROTA: un precio capturado sin IGV se guardo como %', v_precio;
+  end if;
+
+  -- Convenio A si captura con IGV: 660.80 tecleados son 560.00 guardados.
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio)
+  values ('11111111-0000-0000-0000-000000000001',
+          '44444444-0000-0000-0000-000000000002',
+          'aaaa0000-0000-0000-0000-000000000001', 660.80);
+
+  select precio into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000002'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 560.00 then
+    raise exception 'D-07 ROTA: 660.80 con IGV debio guardarse como 560.00, guardo %', v_precio;
+  end if;
+
+  -- Y la misma cifra en la lista que NO captura con IGV se queda igual.
+  insert into lista_precio_item (tenant_id, lista_precio_id, servicio_id, precio)
+  values ('11111111-0000-0000-0000-000000000001',
+          '44444444-0000-0000-0000-000000000001',
+          'aaaa0000-0000-0000-0000-000000000001', 660.80);
+
+  select precio into v_precio from lista_precio_item
+   where lista_precio_id = '44444444-0000-0000-0000-000000000001'
+     and servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_precio <> 660.80 then
+    raise exception 'D-07 ROTA: un precio sin IGV no debe tocarse, guardo %', v_precio;
+  end if;
+
+  raise notice 'OK 12 · D-07 · el modo de captura es de la lista, y se aplica al guardar';
+
+  -- ── 12b · todo cambio de precio deja rastro ─────────────────────────
+  -- Sin historial, subir una tarifa es indistinguible de un dedazo, y a
+  -- la pregunta "¿desde cuando cuesta esto?" no responde nadie.
+  select count(*) into n from precio_historial
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if n <> 3 then
+    raise exception 'Deberia haber 3 movimientos de precio (1 servicio + 2 listas), hay %', n;
+  end if;
+
+  update servicio set precio_base = 680.00
+   where id = 'aaaa0000-0000-0000-0000-000000000001';
+
+  select count(*) into n from precio_historial
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001'
+     and precio_antes = 620.00 and precio_despues = 680.00;
+  if n <> 1 then
+    raise exception 'El cambio de 620.00 a 680.00 no quedo registrado';
+  end if;
+
+  -- Guardar el mismo precio no es un cambio de precio.
+  select count(*) into n from precio_historial
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  update servicio set precio_base = 680.00
+   where id = 'aaaa0000-0000-0000-0000-000000000001';
+
+  select count(*) into v_ruido from precio_historial
+   where servicio_id = 'aaaa0000-0000-0000-0000-000000000001';
+  if v_ruido <> n then
+    raise exception 'Guardar el mismo precio ensucio el historial (% -> %)', n, v_ruido;
+  end if;
+
+  raise notice 'OK 12b · el historial de precios lo escribe el trigger, sin ruido';
+
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -414,4 +485,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 15 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 17 comprobaciones pasan'

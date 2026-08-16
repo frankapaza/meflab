@@ -58,6 +58,37 @@ insert into public.lista_precio (id, tenant_id, nombre, precios_incluyen_igv, es
   ('a0000000-0000-4000-8000-000000000031', 'a0000000-0000-4000-8000-000000000001',
    'Convenio A', true, false);
 
+-- ── catálogo de servicios ─────────────────────────────────────────────
+-- Los precios se teclean como los tiene el laboratorio en su tarifario.
+-- La lista por defecto captura SIN IGV, así que se guardan tal cual; si
+-- mañana se cambia la lista a captura con IGV, el trigger normaliza.
+insert into public.categoria_servicio (id, tenant_id, nombre, orden) values
+  ('a0000000-0000-4000-8000-000000000050', 'a0000000-0000-4000-8000-000000000001', 'Prótesis fija', 1),
+  ('a0000000-0000-4000-8000-000000000051', 'a0000000-0000-4000-8000-000000000001', 'Prótesis removible', 2),
+  ('a0000000-0000-4000-8000-000000000052', 'a0000000-0000-4000-8000-000000000001', 'Estética', 3),
+  ('a0000000-0000-4000-8000-000000000053', 'a0000000-0000-4000-8000-000000000001', 'Implantes', 4),
+  ('a0000000-0000-4000-8000-000000000054', 'a0000000-0000-4000-8000-000000000001', 'Ortodoncia', 5);
+
+insert into public.servicio (tenant_id, categoria_id, area_id, codigo, nombre, precio_base)
+select 'a0000000-0000-4000-8000-000000000001', s.categoria,
+       'a0000000-0000-4000-8000-000000000020', s.codigo, s.nombre, s.precio
+from (values
+  ('a0000000-0000-4000-8000-000000000050'::uuid, 'COR-ZIR',  'Corona de zirconio monolítica',       620.00),
+  ('a0000000-0000-4000-8000-000000000050'::uuid, 'COR-EMAX', 'Corona de disilicato de litio',        680.00),
+  ('a0000000-0000-4000-8000-000000000050'::uuid, 'COR-MET',  'Corona metal-porcelana',               380.00),
+  ('a0000000-0000-4000-8000-000000000050'::uuid, 'INC-ONL',  'Incrustación / onlay',                 340.00),
+  ('a0000000-0000-4000-8000-000000000050'::uuid, 'PUE-ZIR',  'Puente de zirconio (por unidad)',      590.00),
+  ('a0000000-0000-4000-8000-000000000051'::uuid, 'PPR-ACR',  'Prótesis parcial removible acrílica',  450.00),
+  ('a0000000-0000-4000-8000-000000000051'::uuid, 'PPR-CRO',  'Prótesis parcial removible cromo',     880.00),
+  ('a0000000-0000-4000-8000-000000000051'::uuid, 'PTO-ACR',  'Prótesis total acrílica',              720.00),
+  ('a0000000-0000-4000-8000-000000000052'::uuid, 'CAR-EMAX', 'Carilla de disilicato de litio',       540.00),
+  ('a0000000-0000-4000-8000-000000000052'::uuid, 'CAR-COMP', 'Carilla de composite',                 260.00),
+  ('a0000000-0000-4000-8000-000000000053'::uuid, 'COR-IMP',  'Corona sobre implante atornillada',    980.00),
+  ('a0000000-0000-4000-8000-000000000053'::uuid, 'BAR-HIB',  'Barra híbrida sobre implantes',       2400.00),
+  ('a0000000-0000-4000-8000-000000000054'::uuid, 'RET-FIJ',  'Retenedor fijo lingual',               180.00),
+  ('a0000000-0000-4000-8000-000000000054'::uuid, 'ALI-TRA',  'Alineador termoformado (por juego)',   320.00)
+) as s(categoria, codigo, nombre, precio);
+
 -- ── escala de color (M-09) ────────────────────────────────────────────
 insert into public.escala_color (id, tenant_id, nombre) values
   ('a0000000-0000-4000-8000-000000000040', 'a0000000-0000-4000-8000-000000000001',
