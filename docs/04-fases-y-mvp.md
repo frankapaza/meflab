@@ -84,11 +84,22 @@ Sin pantallas de negocio. Es la base sobre la que todo lo demás se apoya.
 | 0.5 | **Tokens del sistema de diseño en Tailwind v4**: color claro/oscuro, tipografía, espaciado, radios, elevación, 3 densidades |
 | 0.6 | **Primitivos de shadcn tematizados** con los tokens: botón, campo, tabla, badge, modal, chip, medidor |
 | 0.7 | **Layout**: barra lateral por rol, cabecera, buscador global, conmutador de tema y densidad, responsive |
-| 0.8 | Dominio propio + TLS + cabeceras de seguridad + HSTS |
-| 0.9 | Sentry, seed de catálogos, tipos generados |
+| 0.8a | **Cabeceras de seguridad**: `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP, sin `X-Powered-By`. HSTS activo sólo en producción |
+| 0.8b | Dominio propio + TLS · **requiere cuenta Vercel** |
+| 0.9a | Seed de catálogos y **tipos TypeScript generados del esquema** (`npm run db:types`) |
+| 0.9b | Sentry · **requiere cuenta** |
 | 0.10 | **Área única por defecto**: `area('GENERAL')` sembrada, `area_id` con default en las 6 tablas que la llevan, y la UI de áreas oculta tras un flag |
 
 **Definición de terminado:** dos usuarios de laboratorios distintos entran y no ven ni un registro del otro, **verificado en base de datos**; y una pantalla de muestra renderiza correctamente en tema claro, oscuro y las tres densidades.
+
+> **Nada de la Fase 0 exige cuentas en la nube.** Todo se desarrolla y se prueba en local: Supabase corre en Docker (`npm run db:start`) con Postgres, Auth, Storage y Studio, y Next en `npm run dev`.
+>
+> Sólo **0.8b** (dominio y TLS) y **0.9b** (Sentry) necesitan cuentas, y ninguno de los dos bloquea construir. Lo que se pierde mientras tanto es concreto y acotado:
+> - No hay URL de preview para enseñarle el avance al laboratorio.
+> - No hay captura de errores de usuarios reales.
+> - No se puede probar en un móvil de verdad, sólo en el emulador.
+>
+> Ninguna de las tres impide escribir la Fase 1. Cuando existan las cuentas es `supabase link` + `db push` y conectar el repositorio a Vercel: las migraciones y el seed ya están probados.
 
 > **Por qué el área entra en el esquema aunque no se use todavía.** Es el mismo razonamiento de D‑05 con multi‑tenant: el área es una **decisión de esquema, no una funcionalidad**. Hoy cuesta una columna con valor por defecto. Después de cargar datos obliga a migrar `servicio`, `detalle_trabajo`, `tarea_produccion`, `proceso`, `flujo_produccion` y `usuario`, y a reasignar a mano cada registro existente.
 >
