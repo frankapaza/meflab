@@ -72,6 +72,7 @@ declare
   v_codigo text;
   v_orden uuid;
   v_doctor_ind uuid;
+  v_doc text;
   v_precio numeric;
 begin
   -- ── 1 · D-07 · la captura con IGV se normaliza a valor de venta ─────
@@ -316,6 +317,96 @@ begin
 
   raise notice 'OK 10b · un alta fallida no deja cliente fantasma';
 
+  -- ── 11 · el tecnico NO ve el documento ni la edad del paciente ──────
+  -- El paciente es la unica persona del sistema que no ha consentido
+  -- nada: llega en la orden de su odontologo. El tecnico necesita saber
+  -- para quien es el trabajo, no quien es.
+  insert into paciente (id, tenant_id, nombre, tipo_documento, numero_documento, fecha_nacimiento)
+  values ('77777777-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001',
+          'Lucia Mendoza Rios', 'DNI', '45871239', '1990-05-14');
+
+  -- Se ataca con RLS puesta: como `authenticated`, que es el rol con el
+  -- que llega cualquier token del navegador. Sin esto la prueba correria
+  -- como superusuario y no probaria nada.
+  set local role authenticated;
+
+  set local request.jwt.claims =
+    '{"tenant_id":"11111111-0000-0000-0000-000000000001","roles":["recepcion"]}';
+
+  select numero_documento into v_doc from v_paciente
+   where id = '77777777-0000-0000-0000-000000000002';
+  if v_doc is null then
+    raise exception 'Recepcion deberia ver el documento del paciente y no lo ve';
+  end if;
+
+  set local request.jwt.claims =
+    '{"tenant_id":"11111111-0000-0000-0000-000000000001","roles":["tecnico","lider_area"]}';
+
+  select numero_documento into v_doc from v_paciente
+   where id = '77777777-0000-0000-0000-000000000002';
+  if v_doc is not null then
+    raise exception 'FUGA: el tecnico ve el documento del paciente (%)', v_doc;
+  end if;
+
+  select count(*) into n from v_paciente
+   where id = '77777777-0000-0000-0000-000000000002'
+     and (edad is not null or fecha_nacimiento is not null or ve_datos_sensibles);
+  if n <> 0 then
+    raise exception 'FUGA: el tecnico ve la edad o la fecha de nacimiento del paciente';
+  end if;
+
+  -- Pero el nombre si: sin el, el trabajo no se puede identificar.
+  select count(*) into n from v_paciente
+   where id = '77777777-0000-0000-0000-000000000002' and nombre is not null;
+  if n <> 1 then
+    raise exception 'El tecnico tiene que ver el nombre del paciente';
+  end if;
+
+  -- Y no puede saltarse la vista pidiendo la tabla. El token del tecnico
+  -- es el mismo que usa el navegador contra PostgREST: si `paciente`
+  -- siguiera siendo legible, la vista seria decoracion.
+  select count(*) into n from paciente;
+  if n <> 0 then
+    raise exception 'FUGA: el tecnico lee % fila(s) directamente de paciente', n;
+  end if;
+
+  -- Y la vista no puede convertirse en un agujero entre laboratorios: se
+  -- ejecuta saltando RLS, asi que filtra el tenant ella misma.
+  set local request.jwt.claims =
+    '{"tenant_id":"99999999-9999-9999-9999-999999999999","roles":["administrador"]}';
+
+  select count(*) into n from v_paciente;
+  if n <> 0 then
+    raise exception 'FUGA ENTRE TENANTS: v_paciente enseña % paciente(s) ajenos', n;
+  end if;
+
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+
+  raise notice 'OK 11 · el tecnico ve el nombre del paciente, no su documento';
+
+  -- ── 11b · un paciente completo no puede quedarse sin documento ──────
+  -- RN-002 permite registrar solo el nombre, pero entonces hay que
+  -- DECLARARLO simplificado. Si no, un paciente sin documento se cuela
+  -- como completo y nadie vuelve a completarlo.
+  begin
+    insert into paciente (tenant_id, nombre, simplificado)
+    values ('11111111-0000-0000-0000-000000000001', 'Paciente A Medias', false);
+    raise exception 'La base acepto un paciente completo sin documento';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    insert into paciente (tenant_id, nombre, simplificado, tipo_documento, numero_documento)
+    values ('11111111-0000-0000-0000-000000000001', 'Paciente Mal', false, 'DNI', '123');
+    raise exception 'La base acepto un paciente con DNI invalido';
+  exception
+    when check_violation then null;
+  end;
+
+  raise notice 'OK 11b · RN-002 · el paciente sin documento se declara simplificado';
+
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -323,4 +414,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 13 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 15 comprobaciones pasan'

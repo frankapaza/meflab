@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useId, useRef, useState } from "react";
 
 import {
   Dialog,
@@ -45,6 +45,7 @@ export function DialogoDoctor({
   const editando = Boolean(doctor);
   const [abierto, setAbierto] = useState(false);
   const idForm = useId();
+  const refNombre = useRef<HTMLInputElement>(null);
 
   const clinicas = clientes.filter((c) => c.tipo === "clinica");
 
@@ -93,7 +94,15 @@ export function DialogoDoctor({
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[580px]">
+      {/* Sin esto el foco cae en el primer botón, que es el selector de
+          vínculo: pulsar espacio sin mirar cambiaría la rama del alta. */}
+      <DialogContent
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          refNombre.current?.focus();
+        }}
+        className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[580px]"
+      >
         <DialogHeader className="border-b border-line px-s5 py-s4">
           <DialogTitle className="text-xl font-semibold tracking-tight">
             {editando ? doctor!.nombre : "Nuevo doctor"}
@@ -144,6 +153,7 @@ export function DialogoDoctor({
 
           <Campo etiqueta="Nombre del doctor *" id={`${idForm}-n`}>
             <input
+              ref={refNombre}
               id={`${idForm}-n`}
               name="nombre"
               required

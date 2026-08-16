@@ -194,9 +194,25 @@ Leyenda: **T** total (ver, crear, editar, eliminar) · **E** editar (ver, crear,
 | Nadie ve datos de otro laboratorio (`tenant_id`) |
 | El Técnico solo ve las tareas que tiene asignadas |
 | El Líder de Área solo ve órdenes y tareas de su área |
-| Los datos de paciente se restringen por rol (RNF‑006) |
+| Los datos de paciente se restringen por rol (RNF‑006) — ver nota abajo |
 | La bitácora de auditoría es de solo lectura, y solo para Administrador y Gerente |
 | El portal del doctor (Fase 4) solo ve las órdenes de su propio cliente |
+
+> **RNF‑006, cómo está implementado.** El paciente es la única persona del
+> sistema que no es cliente nuestro y que no consintió nada: llega en la
+> orden de su odontólogo. RLS filtra filas, no columnas, así que la tabla
+> `paciente` **no es legible** más que para Recepción, Administrador y
+> Gerencia. Todos los demás leen de la vista `v_paciente`, que enseña el
+> nombre y tapa el documento, la fecha de nacimiento y la edad.
+>
+> No basta con tapar las columnas en la vista: el token del técnico es el
+> mismo que usa el navegador contra PostgREST, y con la tabla abierta
+> bastaría con pedir `/rest/v1/paciente` para saltársela. Por eso se cierra
+> la tabla y la vista queda como única puerta. Como la vista se ejecuta
+> saltando RLS, filtra el laboratorio ella misma.
+>
+> Las pantallas de producción y entregas leen el paciente **de la vista**,
+> nunca de la tabla.
 
 ---
 

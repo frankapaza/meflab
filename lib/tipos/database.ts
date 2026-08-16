@@ -1007,6 +1007,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orden_trabajo_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "v_paciente"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orden_trabajo_sede_id_fkey"
             columns: ["sede_id"]
             isOneToOne: false
@@ -1637,7 +1644,56 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_paciente: {
+        Row: {
+          created_at: string | null
+          edad: number | null
+          fecha_nacimiento: string | null
+          id: string | null
+          nombre: string | null
+          numero_documento: string | null
+          simplificado: boolean | null
+          tenant_id: string | null
+          tipo_documento: string | null
+          updated_at: string | null
+          ve_datos_sensibles: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          edad?: never
+          fecha_nacimiento?: never
+          id?: string | null
+          nombre?: string | null
+          numero_documento?: never
+          simplificado?: boolean | null
+          tenant_id?: string | null
+          tipo_documento?: never
+          updated_at?: string | null
+          ve_datos_sensibles?: never
+        }
+        Update: {
+          created_at?: string | null
+          edad?: never
+          fecha_nacimiento?: never
+          id?: string | null
+          nombre?: string | null
+          numero_documento?: never
+          simplificado?: boolean | null
+          tenant_id?: string | null
+          tipo_documento?: never
+          updated_at?: string | null
+          ve_datos_sensibles?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       area_default: { Args: { p_tenant: string }; Returns: string }

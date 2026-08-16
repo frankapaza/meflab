@@ -114,8 +114,13 @@ create table public.paciente (
   created_by        uuid,
   updated_at        timestamptz not null default now(),
   updated_by        uuid,
+  -- Un paciente completo trae documento; el simplificado, sólo el nombre.
+  -- Y el número sin el tipo no sirve para nada: no se sabe qué validar ni
+  -- qué imprimir en el comprobante.
   constraint paciente_completo_tiene_documento
-    check (simplificado or numero_documento is not null)
+    check (simplificado or (tipo_documento is not null and numero_documento is not null)),
+  constraint paciente_documento_completo
+    check (num_nulls(tipo_documento, numero_documento) <> 1)
 );
 
 -- ── 4 · CATÁLOGO Y TARIFAS ────────────────────────────────────────────
@@ -791,6 +796,13 @@ alter table public.cliente
   add constraint cliente_documento_valido
   check (public.documento_valido(tipo_documento, numero_documento));
 
+-- El paciente puede no traer documento (RN-002), pero si lo trae se valida
+-- igual que el del cliente: acaba en el comprobante de la misma forma.
+alter table public.paciente
+  add constraint paciente_documento_valido
+  check (numero_documento is null
+         or public.documento_valido(tipo_documento, numero_documento));
+
 -- ── 12 · ALTA DE DOCTOR INDEPENDIENTE ─────────────────────────────────
 -- D-01: un doctor independiente es un cliente con un único doctor
 -- asociado. La interfaz oculta esa dualidad, pero la facturación la
@@ -860,3 +872,59 @@ comment on function public.registrar_doctor_independiente is
 -- NO hay índice único de doctor por cliente, y es deliberado: una clínica
 -- agrupa VARIOS doctores con una sola deuda — es el caso central de D-01.
 -- Un índice sobre doctor(cliente_id) rompería justamente eso.
+
+-- ── 13 · DATOS DEL PACIENTE SEGÚN QUIÉN MIRA ──────────────────────────
+-- El paciente es la única persona del sistema que no es cliente nuestro y
+-- que no ha consentido nada: llega en la orden de su odontólogo. El
+-- técnico necesita saber PARA QUIÉN es el trabajo, no quién es.
+--
+-- RLS filtra filas, no columnas. Para tapar el documento y la edad hace
+-- falta una vista, y tiene que estar en la base: si el filtro viviera en
+-- la aplicación, cualquier consulta nueva a `paciente` volvería a
+-- destaparlo sin que nadie se diera cuenta (regla 7).
+--
+-- Y no basta con la vista. El token del técnico es el mismo que usa el
+-- navegador contra PostgREST: si la tabla siguiera siendo legible para
+-- él, bastaría con pedir `/rest/v1/paciente` para saltarse la vista. Así
+-- que la tabla se cierra y la vista queda como ÚNICA puerta de lectura.
+--
+-- Por eso la vista NO es security_invoker: se ejecuta con los permisos de
+-- quien la creó y por tanto tiene que filtrar el laboratorio ella misma.
+-- Ese `where` de abajo no es decorativo — sin él, la vista se saltaría el
+-- aislamiento entre laboratorios, que es la regla 1.
+create or replace view public.v_paciente as
+select
+  p.id,
+  p.tenant_id,
+  p.nombre,
+  p.simplificado,
+  case when public.tiene_rol('recepcion','administrador','gerencia')
+       then p.tipo_documento end                                as tipo_documento,
+  case when public.tiene_rol('recepcion','administrador','gerencia')
+       then p.numero_documento end                              as numero_documento,
+  case when public.tiene_rol('recepcion','administrador','gerencia')
+       then p.fecha_nacimiento end                              as fecha_nacimiento,
+  case when public.tiene_rol('recepcion','administrador','gerencia')
+       then extract(year from age(p.fecha_nacimiento))::int end as edad,
+  -- Esta bandera es para la interfaz: le permite decir "no tienes permiso
+  -- para ver esto" en vez de enseñar un hueco que parece un dato que falta.
+  public.tiene_rol('recepcion','administrador','gerencia')       as ve_datos_sensibles,
+  p.created_at,
+  p.updated_at
+from public.paciente p
+where p.tenant_id = public.current_tenant_id();
+
+comment on view public.v_paciente is
+  'Única puerta de lectura de paciente. Tapa documento y edad a quien no es Recepción, Administrador o Gerencia, y filtra el laboratorio ella misma. Producción y entregas leen de aquí, no de la tabla.';
+
+grant select on public.v_paciente to authenticated, service_role;
+
+-- La tabla deja de ser legible directamente. Recepción, Administrador y
+-- Gerencia siguen leyéndola porque la política de escritura es `for all`,
+-- y la necesitan para editar. El resto pasa por la vista o no pasa.
+drop policy if exists paciente_lectura on public.paciente;
+create policy paciente_lectura on public.paciente
+  for select using (
+    tenant_id = public.current_tenant_id()
+    and public.tiene_rol('recepcion','administrador','gerencia')
+  );
