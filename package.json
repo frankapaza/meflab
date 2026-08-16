@@ -10,7 +10,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:test": "supabase db reset && docker exec -i supabase_db_meflab psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -f - < supabase/tests/0001_core_rls.sql",
+    "db:test": "supabase db reset && node scripts/db-test.mjs",
     "db:studio": "echo http://127.0.0.1:54323"
   },
   "dependencies": {

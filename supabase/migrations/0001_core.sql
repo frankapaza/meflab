@@ -217,7 +217,9 @@ create table public.serie (
   correlativo   integer     not null default 0,
   activo        boolean     not null default true,
   created_at    timestamptz not null default now(),
+  created_by    uuid,
   updated_at    timestamptz not null default now(),
+  updated_by    uuid,
   unique (tenant_id, tipo_doc, serie),
   constraint serie_correlativo_no_negativo check (correlativo >= 0)
 );
@@ -245,22 +247,28 @@ create index auditoria_tenant_fecha_idx
 create index auditoria_tabla_idx
   on public.auditoria (tabla, ocurrido_en desc);
 
-comment on table public.auditoria is
-  'Sólo lectura para Administrador y Gerencia. No se puede editar ni borrar (RF-210).';
-
 -- ── 4 · TRIGGERS ──────────────────────────────────────────────────────
 
+-- Se aplica a tablas de forma distinta, así que no puede dar por sentado
+-- que todas tengan `updated_by`. Trabajar sobre jsonb la hace segura de
+-- colgar en cualquier tabla sin romper el INSERT/UPDATE.
 create or replace function public.tg_touch_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
+declare
+  v_parche jsonb := jsonb_build_object('updated_at', now());
 begin
-  new.updated_at := now();
-  new.updated_by := auth.uid();
-  return new;
+  if to_jsonb(new) ? 'updated_by' then
+    v_parche := v_parche || jsonb_build_object('updated_by', auth.uid());
+  end if;
+  return jsonb_populate_record(new, v_parche);
 end;
 $$;
+
+comment on function public.tg_touch_updated_at is
+  'Sella updated_at, y updated_by si la tabla lo tiene. Segura de colgar en cualquier tabla.';
 
 -- Devuelve la clave primaria de un registro como texto, sea simple o
 -- compuesta. No se puede asumir que toda tabla tenga columna `id`:
@@ -404,10 +412,46 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant usage, select on all sequences in schema public to authenticated;
 grant execute on all functions in schema public to anon, authenticated;
 
--- La bitácora es inalterable incluso para quien puede leerla. RLS ya lo
--- impide (no hay política de escritura); esto lo impide otra vez a nivel
--- de privilegio, que es la defensa que no depende de una política.
-revoke insert, update, delete on public.auditoria from authenticated;
+-- ── 6.1 · TABLAS DE SÓLO AÑADIR ───────────────────────────────────────
+-- Bitácoras e historiales: los escribe un trigger, nadie los edita.
+--
+-- El problema que resuelve esto: `grant ... on all tables` es cómodo, pero
+-- una migración posterior que lo repita VUELVE A CONCEDER el borrado que
+-- ésta acaba de revocar. Pasó de verdad entre 0001 y 0002, y lo detectó la
+-- prueba, no la lectura del código.
+--
+-- Solución: la tabla se marca a sí misma con @append-only en su comentario
+-- y esta función revoca sobre todas las marcadas. Cada migración la llama
+-- al final. Así la lista se mantiene sola y no hay nada que recordar.
+create or replace function public.asegurar_append_only()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare t text;
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relkind = 'r'
+       and coalesce(obj_description(c.oid, 'pg_class'), '') like '%@append-only%'
+  loop
+    execute format(
+      'revoke insert, update, delete on public.%I from authenticated;', t);
+  end loop;
+end;
+$$;
+
+comment on function public.asegurar_append_only is
+  'Revoca escritura sobre toda tabla marcada @append-only. Llamar al final de CADA migración.';
+
+comment on table public.auditoria is
+  'Sólo lectura para Administrador y Gerencia. No se puede editar ni borrar (RF-210). @append-only';
+
+select public.asegurar_append_only();
 
 -- ── 7 · AUDITORÍA Y updated_at SOBRE LAS TABLAS DE ESTE ARCHIVO ───────
 do $$
