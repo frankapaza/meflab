@@ -6,7 +6,7 @@ import { ZodError } from "zod";
 import { SinPermiso, exigirRol } from "@/lib/auth/permisos";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { clienteSchema } from "@/lib/validaciones/cliente";
-import { soloDigitos } from "@/lib/validaciones/documento";
+import { normalizarDocumento } from "@/lib/validaciones/documento";
 
 export type Resultado = { ok: boolean; mensaje: string | null };
 
@@ -52,9 +52,9 @@ export async function guardarCliente(
       tipo: datos.tipo as never,
       razon_social: datos.razonSocial,
       tipo_documento: datos.tipoDocumento,
-      // Se guarda sin guiones ni espacios: si no, el mismo cliente puede
-      // registrarse dos veces con formatos distintos.
-      numero_documento: soloDigitos(datos.numeroDocumento) || datos.numeroDocumento,
+      // Se guarda normalizado: si no, el mismo cliente puede registrarse dos
+      // veces con formatos distintos y el índice único no lo impediría.
+      numero_documento: normalizarDocumento(datos.tipoDocumento, datos.numeroDocumento),
       direccion: datos.direccion || null,
       email: datos.email || null,
       telefono: datos.telefono || null,

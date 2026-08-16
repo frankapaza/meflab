@@ -790,3 +790,73 @@ $$;
 alter table public.cliente
   add constraint cliente_documento_valido
   check (public.documento_valido(tipo_documento, numero_documento));
+
+-- ── 12 · ALTA DE DOCTOR INDEPENDIENTE ─────────────────────────────────
+-- D-01: un doctor independiente es un cliente con un único doctor
+-- asociado. La interfaz oculta esa dualidad, pero la facturación la
+-- necesita: sin sujeto comercial no hay comprobante.
+--
+-- Va en una función y no en dos llamadas desde la aplicación porque tiene
+-- que ser ATÓMICO. Si el cliente se crea y el doctor falla, queda un
+-- cliente fantasma que nadie va a limpiar; al revés es imposible por la
+-- clave foránea, pero el fantasma sí ocurre.
+--
+-- security invoker: se ejecuta con los permisos de quien llama, así que
+-- RLS sigue aplicando. Esto NO es una puerta trasera.
+create or replace function public.registrar_doctor_independiente(
+  p_nombre           text,
+  p_tipo_documento   text,
+  p_numero_documento text,
+  p_colegiatura      text default null,
+  p_especialidad     text default null,
+  p_email            text default null,
+  p_telefono         text default null,
+  p_sede_entrega     text default null,
+  p_dias_credito     integer default 0,
+  p_linea_credito    numeric default null,
+  p_lista_precio_id  uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_tenant  uuid := public.current_tenant_id();
+  v_cliente uuid;
+  v_doctor  uuid;
+begin
+  if v_tenant is null then
+    raise exception 'Sin sesión válida' using errcode = '42501';
+  end if;
+
+  -- El cliente lleva el nombre del propio doctor: para quien usa el
+  -- sistema, "Dr. Camacho" es a la vez el doctor y a quien se le factura.
+  insert into public.cliente (
+    tenant_id, tipo, razon_social, tipo_documento, numero_documento,
+    email, telefono, dias_credito, linea_credito, lista_precio_id, created_by
+  ) values (
+    v_tenant, 'doctor_independiente', p_nombre, p_tipo_documento, p_numero_documento,
+    p_email, p_telefono, p_dias_credito, p_linea_credito, p_lista_precio_id, auth.uid()
+  )
+  returning id into v_cliente;
+
+  insert into public.doctor (
+    tenant_id, cliente_id, nombre, colegiatura, especialidad,
+    email, telefono, sede_entrega, created_by
+  ) values (
+    v_tenant, v_cliente, p_nombre, p_colegiatura, p_especialidad,
+    p_email, p_telefono, p_sede_entrega, auth.uid()
+  )
+  returning id into v_doctor;
+
+  return v_doctor;
+end;
+$$;
+
+comment on function public.registrar_doctor_independiente is
+  'Crea cliente + doctor en una sola transacción (D-01). Si algo falla, no queda ningún cliente fantasma.';
+
+-- NO hay índice único de doctor por cliente, y es deliberado: una clínica
+-- agrupa VARIOS doctores con una sola deuda — es el caso central de D-01.
+-- Un índice sobre doctor(cliente_id) rompería justamente eso.

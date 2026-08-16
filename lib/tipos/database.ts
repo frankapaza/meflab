@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -1645,6 +1645,10 @@ export type Database = {
       asegurar_append_only: { Args: never; Returns: undefined }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      documento_valido: {
+        Args: { p_numero: string; p_tipo: string }
+        Returns: boolean
+      }
       generar_codigo_orden: { Args: { p_tenant: string }; Returns: string }
       instanciar_etapas: { Args: { p_orden: string }; Returns: number }
       jwt_claims: { Args: never; Returns: Json }
@@ -1657,6 +1661,23 @@ export type Database = {
         Args: { p_fila: Json; p_relid: unknown }
         Returns: string
       }
+      registrar_doctor_independiente: {
+        Args: {
+          p_colegiatura?: string
+          p_dias_credito?: number
+          p_email?: string
+          p_especialidad?: string
+          p_linea_credito?: number
+          p_lista_precio_id?: string
+          p_nombre: string
+          p_numero_documento: string
+          p_sede_entrega?: string
+          p_telefono?: string
+          p_tipo_documento: string
+        }
+        Returns: string
+      }
+      ruc_valido: { Args: { p_ruc: string }; Returns: boolean }
       siguiente_correlativo: {
         Args: { p_serie: string; p_tenant: string; p_tipo_doc: string }
         Returns: number

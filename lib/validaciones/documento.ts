@@ -90,3 +90,16 @@ export function tipoContribuyente(ruc: string): string | null {
 export function soloDigitos(valor: string): string {
   return valor.replace(/\D/g, "");
 }
+
+/**
+ * Cómo se guarda el número, según su tipo.
+ *
+ * RUC y DNI son numéricos por definición, así que se les quitan guiones y
+ * espacios: si no, el mismo cliente entra dos veces con formatos distintos.
+ * El carné de extranjería y el pasaporte SÍ pueden llevar letras, y
+ * quitárselas los convertiría en otro documento — sólo se recortan.
+ */
+export function normalizarDocumento(tipo: string, numero: string): string {
+  if (tipo === "RUC" || tipo === "DNI") return soloDigitos(numero);
+  return numero.trim().toUpperCase();
+}

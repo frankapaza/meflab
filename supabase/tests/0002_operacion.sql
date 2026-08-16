@@ -71,6 +71,7 @@ declare
   n int;
   v_codigo text;
   v_orden uuid;
+  v_doctor_ind uuid;
   v_precio numeric;
 begin
   -- ── 1 · D-07 · la captura con IGV se normaliza a valor de venta ─────
@@ -183,6 +184,21 @@ begin
 
   raise notice 'OK 6 · D-01 · el doctor siempre pertenece a un cliente';
 
+  -- ── 6b · una clinica agrupa VARIOS doctores ─────────────────────────
+  -- Es el caso central de D-01: varios doctores, una sola deuda. Si algo
+  -- lo impidiera, el modelo comercial entero se cae.
+  insert into doctor (tenant_id, cliente_id, nombre) values
+    ('11111111-0000-0000-0000-000000000001', '55555555-0000-0000-0000-000000000001', 'Dra. Paula Requena'),
+    ('11111111-0000-0000-0000-000000000001', '55555555-0000-0000-0000-000000000001', 'Dr. Marco Tuesta');
+
+  select count(*) into n from doctor
+   where cliente_id = '55555555-0000-0000-0000-000000000001';
+  if n < 3 then
+    raise exception 'D-01 ROTA: una clinica solo admite % doctor(es)', n;
+  end if;
+
+  raise notice 'OK 6b · una clinica agrupa varios doctores con una sola deuda';
+
   -- ── 7 · D-02 · no existe ninguna columna de deuda en la orden ───────
   select count(*) into n
     from information_schema.columns
@@ -246,10 +262,65 @@ begin
   end if;
 
   raise notice 'OK 9 · las bitacoras siguen siendo de solo anadir';
+
+  -- ── 10 · D-01 · el alta de doctor independiente es ATOMICA ──────────
+  -- La funcion existe justamente para esto: si crea el cliente y luego
+  -- falla el doctor, queda un cliente fantasma que nadie limpia.
+  perform set_config(
+    'request.jwt.claims',
+    '{"tenant_id":"11111111-0000-0000-0000-000000000001"}',
+    true
+  );
+
+  select registrar_doctor_independiente(
+    p_nombre           => 'Dra. Elsa Salcedo',
+    p_tipo_documento   => 'RUC',
+    p_numero_documento => '10456782341',
+    p_colegiatura      => 'COP 31204',
+    p_sede_entrega     => 'Miraflores, Lima'
+  ) into v_doctor_ind;
+
+  select count(*) into n
+    from doctor d
+    join cliente c on c.id = d.cliente_id
+   where d.id = v_doctor_ind
+     and c.tipo = 'doctor_independiente'
+     and c.razon_social = 'Dra. Elsa Salcedo'
+     and d.sede_entrega = 'Miraflores, Lima';
+  if n <> 1 then
+    raise exception 'El alta independiente no dejo cliente + doctor enlazados';
+  end if;
+
+  raise notice 'OK 10 · D-01 · el doctor independiente nace con su cliente';
+
+  -- ── 10b · y si el documento es invalido, NO queda cliente fantasma ──
+  -- Lo que guarda esta prueba es que el error SALGA de la funcion. Si
+  -- alguien le metiera un `exception when others then null` alrededor del
+  -- insert del doctor, el cliente quedaria creado y la llamada diria que
+  -- todo fue bien: exactamente el fantasma que la funcion evita.
+  begin
+    perform registrar_doctor_independiente(
+      p_nombre           => 'Dr. Fantasma',
+      p_tipo_documento   => 'RUC',
+      p_numero_documento => '20512345678'   -- verificador cambiado
+    );
+    raise exception 'La base acepto un doctor independiente con RUC invalido';
+  exception
+    when check_violation then null;
+  end;
+
+  select count(*) into n from cliente where razon_social = 'Dr. Fantasma';
+  if n <> 0 then
+    raise exception 'ATOMICIDAD ROTA: quedaron % cliente(s) fantasma', n;
+  end if;
+
+  raise notice 'OK 10b · un alta fallida no deja cliente fantasma';
+
+  perform set_config('request.jwt.claims', '', true);
 end;
 $$;
 
 rollback;
 
 \echo ''
-\echo '  ✓ 0002_operacion · las 10 comprobaciones pasan'
+\echo '  ✓ 0002_operacion · las 13 comprobaciones pasan'
