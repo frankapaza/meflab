@@ -28,6 +28,35 @@ insert into configuracion (tenant_id, clave, valor) values
 update configuracion set valor = '{"tasa":0.20}'
  where tenant_id = 'aaaaaaaa-0000-0000-0000-000000000001';
 
+-- Un técnico REAL, para que la prueba 6 falle por RLS y no por una clave
+-- foránea inexistente. usuario referencia auth.users, así que hay que
+-- crear también la identidad.
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data, is_sso_user, is_anonymous,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  'cccccccc-0000-0000-0000-000000000003',
+  'authenticated', 'authenticated', 'tecnico.test@labvera.pe',
+  extensions.crypt('irrelevante-para-esta-prueba', extensions.gen_salt('bf')),
+  now(), now(), now(), '{}', '{}', false, false,
+  '', '', '', '', '', '', '', ''
+);
+
+insert into usuario (id, tenant_id, nombre, email) values (
+  'cccccccc-0000-0000-0000-000000000003',
+  'aaaaaaaa-0000-0000-0000-000000000001',
+  'Técnico de prueba', 'tecnico.test@labvera.pe'
+);
+
+insert into usuario_rol (tenant_id, usuario_id, rol) values (
+  'aaaaaaaa-0000-0000-0000-000000000001',
+  'cccccccc-0000-0000-0000-000000000003', 'tecnico'
+);
+
 do $$
 declare
   n int;
@@ -126,6 +155,45 @@ begin
 
   raise notice 'OK 5 · el trigger guarda antes/despues y la clave compuesta';
 
+  -- ── 6 · Nadie se asciende a sí mismo ────────────────────────────────
+  -- La barrera que de verdad importa. Un técnico puede invocar la Server
+  -- Action por HTTP sin pasar por la pantalla; si RLS no lo parara aquí,
+  -- podría concederse el rol de administrador.
+  --
+  -- El usuario del test EXISTE de verdad (se crea arriba, fuera de este
+  -- bloque). Si no existiera, el INSERT fallaría por clave foránea y la
+  -- prueba pasaría por el motivo equivocado, que es peor que no tenerla.
+  set local request.jwt.claims =
+    '{"tenant_id":"aaaaaaaa-0000-0000-0000-000000000001","roles":["tecnico"],"sub":"cccccccc-0000-0000-0000-000000000003"}';
+
+  -- Primero se confirma que el técnico SÍ ve su propia ficha: si no la
+  -- viera, lo de abajo tampoco probaría nada.
+  select count(*) into n from usuario where id = 'cccccccc-0000-0000-0000-000000000003';
+  if n <> 1 then
+    raise exception 'El montaje esta mal: el tecnico no ve su propia ficha';
+  end if;
+
+  -- RLS bloquea de dos formas distintas y hay que aceptar las dos:
+  -- un INSERT contra WITH CHECK lanza excepción (42501), mientras que un
+  -- UPDATE o DELETE contra USING simplemente afecta a 0 filas.
+  begin
+    insert into usuario_rol (tenant_id, usuario_id, rol)
+    values ('aaaaaaaa-0000-0000-0000-000000000001',
+            'cccccccc-0000-0000-0000-000000000003', 'administrador');
+    raise exception 'ESCALADA DE PRIVILEGIOS: un tecnico se asigno el rol de administrador';
+  exception
+    when insufficient_privilege then null;  -- RLS lo paró. Correcto.
+  end;
+
+  -- Tampoco puede cambiarse el nombre de otro, ni el suyo.
+  update usuario set nombre = 'Hackeado';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'ESCALADA DE PRIVILEGIOS: un tecnico modifico % ficha(s)', n;
+  end if;
+
+  raise notice 'OK 6 · un tecnico no puede asignarse roles ni tocar cuentas';
+
   reset role;
 end;
 $$;
@@ -133,4 +201,4 @@ $$;
 rollback;
 
 \echo ''
-\echo '  ✓ 0001_core · las 5 comprobaciones pasan'
+\echo '  ✓ 0001_core · las 6 comprobaciones pasan'

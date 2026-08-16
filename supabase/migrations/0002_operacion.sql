@@ -719,9 +719,9 @@ create policy tarea_produccion_propia on public.tarea_produccion
 -- El de precios, igual.
 
 -- ── 10 · GRANTS ───────────────────────────────────────────────────────
-grant select, insert, update, delete on all tables in schema public to authenticated;
-grant usage, select on all sequences in schema public to authenticated;
-grant execute on all functions in schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated, service_role;
+grant usage, select on all sequences in schema public to authenticated, service_role;
+grant execute on all functions in schema public to anon, authenticated, service_role;
 
 -- Los historiales los escribe un trigger security definer; nadie los edita.
 comment on table public.orden_estado_historial is

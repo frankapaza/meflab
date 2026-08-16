@@ -19,6 +19,14 @@ export function BarraLateral({
 }) {
   const ruta = usePathname();
 
+  // Gana el prefijo MÁS ESPECÍFICO, no todos los que casan. Con un simple
+  // startsWith, estando en /configuracion/usuarios se resaltaban a la vez
+  // "Catálogo y tarifas" (/configuracion) y "Usuarios y permisos".
+  const activo = nav
+    .flatMap((g) => g.items.map((i) => i.href))
+    .filter((h) => (h === "/" ? ruta === "/" : ruta === h || ruta.startsWith(`${h}/`)))
+    .sort((a, b) => b.length - a.length)[0];
+
   return (
     <>
       {/* Velo sólo en móvil, donde la barra se superpone al contenido. */}
@@ -47,21 +55,21 @@ export function BarraLateral({
             </span>
 
             {g.items.map((i) => {
-              const activo = i.href === "/" ? ruta === "/" : ruta.startsWith(i.href);
+              const esActivo = i.href === activo;
               return (
                 <Link
                   key={i.href}
                   href={i.href}
                   onClick={onCerrar}
-                  aria-current={activo ? "page" : undefined}
+                  aria-current={esActivo ? "page" : undefined}
                   className={cn(
                     "relative flex min-h-[32px] items-center gap-s2 rounded-r1 px-s2 text-sm transition",
-                    activo
+                    esActivo
                       ? "bg-acc-bg font-semibold text-acc"
                       : "text-ink-2 hover:bg-fill hover:text-ink",
                   )}
                 >
-                  {activo ? (
+                  {esActivo ? (
                     <span className="absolute -left-s2 inset-y-[6px] w-[2px] rounded-full bg-acc" />
                   ) : null}
                   <span className="flex-1">{i.etiqueta}</span>
