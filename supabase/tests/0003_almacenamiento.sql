@@ -142,7 +142,77 @@ begin
 end;
 $$;
 
+-- ── 5 · elegir los gráficos propios no abre la fila del usuario ───────
+-- Es la razón de que sea una funcion y no una politica: RLS concede la
+-- FILA entera, y con ella un usuario podria cambiarse el correo.
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data, is_sso_user, is_anonymous,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values (
+  '00000000-0000-0000-0000-000000000000', '4444dddd-0000-0000-0000-000000000001',
+  'authenticated', 'authenticated', 'panel.test@labvera.pe',
+  extensions.crypt('irrelevante', extensions.gen_salt('bf')),
+  now(), now(), now(), '{}', '{}', false, false, '', '', '', '', '', '', '', ''
+);
+
+insert into usuario (id, tenant_id, nombre, email)
+values ('4444dddd-0000-0000-0000-000000000001', 'aaaa1111-0000-0000-0000-000000000001',
+        'Usuario de panel', 'panel.test@labvera.pe');
+
+do $$
+declare v_paneles jsonb; n int;
+begin
+  set local role authenticated;
+  set local request.jwt.claims =
+    '{"sub":"4444dddd-0000-0000-0000-000000000001","tenant_id":"aaaa1111-0000-0000-0000-000000000001","roles":["recepcion"]}';
+
+  perform fijar_paneles('["dia","mes"]'::jsonb);
+
+  reset role;
+  select paneles into v_paneles from usuario
+   where id = '4444dddd-0000-0000-0000-000000000001';
+  if v_paneles is distinct from '["dia","mes"]'::jsonb then
+    raise exception 'La seleccion de paneles no se guardo: %', v_paneles;
+  end if;
+
+  -- Una lista vacia es una decision, no un "sin tocar": hay que poder
+  -- guardarla y distinguirla de null.
+  set local role authenticated;
+  set local request.jwt.claims =
+    '{"sub":"4444dddd-0000-0000-0000-000000000001","tenant_id":"aaaa1111-0000-0000-0000-000000000001","roles":["recepcion"]}';
+  perform fijar_paneles('[]'::jsonb);
+
+  -- Y no puede tocar NADA MAS de su fila: la politica de escritura de
+  -- usuario es del Administrador.
+  update usuario set email = 'suplantado@labvera.pe'
+   where id = '4444dddd-0000-0000-0000-000000000001';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'FUGA: un usuario cambio su propio correo';
+  end if;
+
+  reset role;
+  select paneles into v_paneles from usuario
+   where id = '4444dddd-0000-0000-0000-000000000001';
+  if v_paneles is distinct from '[]'::jsonb then
+    raise exception 'No se distingue "ninguno" de "sin tocar": %', v_paneles;
+  end if;
+
+  select count(*) into n from usuario
+   where id = '4444dddd-0000-0000-0000-000000000001' and email = 'panel.test@labvera.pe';
+  if n <> 1 then
+    raise exception 'El correo del usuario cambio';
+  end if;
+
+  perform set_config('request.jwt.claims', '', true);
+  raise notice 'OK 5 · cada quien elige sus graficos, y nada mas de su ficha';
+end;
+$$;
+
 rollback;
 
 \echo ''
-\echo '  ✓ 0003_almacenamiento · las 4 comprobaciones pasan'
+\echo '  ✓ 0003_almacenamiento · las 5 comprobaciones pasan'

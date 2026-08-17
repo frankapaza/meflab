@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 
 import { Barras, Kpi, Linea, Medidor, SERIE, type Punto } from "@/components/graficos";
 import { contextoActual } from "@/lib/auth/permisos";
+import { leerSeleccion, panelesPorDefecto } from "@/lib/dominio/panel";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { horasLegibles } from "@/lib/validaciones/produccion";
+
+import { SelectorPaneles } from "./selector-paneles";
 
 export const metadata = { title: "Dashboard · MEFLAB" };
 
@@ -50,7 +53,8 @@ export default async function Inicio() {
 
   const supabase = await crearClienteServidor();
 
-  const [{ data: ordenes }, { data: tareas }, { data: usuarios }] = await Promise.all([
+  const [{ data: ordenes }, { data: tareas }, { data: usuarios }, { data: yo }] =
+    await Promise.all([
     supabase
       .from("orden_trabajo")
       .select(
@@ -61,7 +65,15 @@ export default async function Inicio() {
       .from("tarea_produccion")
       .select("estado, tecnico_id, horas_estimadas, terminada_en"),
     supabase.from("usuario").select("id, nombre").eq("activo", true),
+    supabase.from("usuario").select("paneles").eq("id", ctx.usuarioId).maybeSingle(),
   ]);
+
+  // null significa "nunca lo he tocado" y manda lo de sus roles; una lista
+  // vacía es una decisión distinta —"no quiero ver ninguno"— y se respeta.
+  const personalizado = yo?.paneles !== null && yo?.paneles !== undefined;
+  const paneles = new Set(
+    personalizado ? leerSeleccion(yo!.paneles, ctx.roles) : panelesPorDefecto(ctx.roles),
+  );
 
   const lista = (ordenes ?? []) as unknown as Orden[];
   const listaTareas = (tareas ?? []) as unknown as Tarea[];
@@ -177,10 +189,13 @@ export default async function Inicio() {
           </span>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         </div>
-        <span className="font-mono text-xs text-ink-3">
-          Hoy {diaMes.format(new Date(`${hoy}T12:00:00`))} · {ctx.roles.length}{" "}
-          {ctx.roles.length === 1 ? "rol" : "roles"}
-        </span>
+        <div className="flex flex-wrap items-center gap-s3">
+          <span className="font-mono text-xs text-ink-3">
+            Hoy {diaMes.format(new Date(`${hoy}T12:00:00`))} · {ctx.roles.length}{" "}
+            {ctx.roles.length === 1 ? "rol" : "roles"}
+          </span>
+          <SelectorPaneles elegidos={[...paneles]} personalizado={personalizado} />
+        </div>
       </header>
 
       {atrasadas.length > 0 ? (
@@ -202,6 +217,7 @@ export default async function Inicio() {
       ) : null}
 
       {/* ── el día ─────────────────────────────────────────────────── */}
+      {paneles.has("dia") ? (
       <section className="flex flex-col gap-s3">
         <h2 className="font-mono text-xs uppercase tracking-wide text-ink-3">Hoy</h2>
         <div className="grid gap-s3 sm:grid-cols-2 lg:grid-cols-4">
@@ -216,8 +232,10 @@ export default async function Inicio() {
           />
         </div>
       </section>
+      ) : null}
 
       {/* ── el mes ─────────────────────────────────────────────────── */}
+      {paneles.has("mes") ? (
       <section className="flex flex-col gap-s3">
         <h2 className="font-mono text-xs uppercase tracking-wide text-ink-3">
           Este mes
@@ -244,23 +262,29 @@ export default async function Inicio() {
           />
         </div>
       </section>
+      ) : null}
 
       {/* ── gráficos ───────────────────────────────────────────────── */}
       <div className="grid gap-s3 lg:grid-cols-2">
+        {paneles.has("serie") ? (
         <Linea
           titulo="Órdenes recibidas"
           descripcion="Últimos 14 días. Sirve para ver si la entrada es estable o a golpes."
           datos={serie}
           color={SERIE[0]}
         />
+        ) : null}
 
+        {paneles.has("embudo") ? (
         <Barras
           titulo="Embudo de producción"
           descripcion="Dónde están ahora mismo los trabajos abiertos. Una acumulación en un estado es un cuello de botella."
           datos={embudo}
           color={SERIE[2]}
         />
+        ) : null}
 
+        {paneles.has("carga") ? (
         <Barras
           titulo="Carga por técnico"
           descripcion="Horas estimadas de lo que cada uno tiene sin terminar."
@@ -268,7 +292,9 @@ export default async function Inicio() {
           formato={horasLegibles}
           color={SERIE[0]}
         />
+        ) : null}
 
+        {paneles.has("doctores") ? (
         <Barras
           titulo="Doctores del mes"
           descripcion="Por valor de venta de los trabajos que pidieron. No es lo que deben."
@@ -276,9 +302,11 @@ export default async function Inicio() {
           formato={(n) => soles.format(n)}
           color={SERIE[1]}
         />
+        ) : null}
 
         {/* Dos medidores con metas de signo opuesto, a propósito: uno es un
             suelo y el otro un techo. No todo indicador mejora subiendo. */}
+        {paneles.has("puntualidad") ? (
         <Medidor
           titulo="Entregas a tiempo"
           descripcion="De lo entregado este mes, cuánto llegó dentro de la fecha comprometida."
@@ -286,7 +314,9 @@ export default async function Inicio() {
           meta={90}
           tipoMeta="suelo"
         />
+        ) : null}
 
+        {paneles.has("capacidad") ? (
         <Medidor
           titulo="Capacidad utilizada"
           descripcion={`${horasLegibles(horasComprometidas)} comprometidas sobre ${horasLegibles(capacidad)} de una jornada.`}
@@ -294,7 +324,17 @@ export default async function Inicio() {
           meta={85}
           tipoMeta="techo"
         />
+        ) : null}
       </div>
+
+      {paneles.size === 0 ? (
+        <div className="grid min-h-[220px] place-items-center rounded-r2 border border-dashed border-line-2 p-s6">
+          <p className="max-w-[400px] text-center text-base leading-relaxed text-ink-2">
+            Has dejado el dashboard sin gráficos. Pulsa «Elegir gráficos» para
+            añadir los que quieras ver.
+          </p>
+        </div>
+      ) : null}
 
       <p className="text-sm leading-relaxed text-ink-3">
         Ninguna cifra de aquí es deuda. Lo que se ve es valor de venta de los

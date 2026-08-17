@@ -107,7 +107,61 @@ create trigger entrega_evidencia_coherente
   before insert or update of evidencia_id on public.entrega
   for each row execute function public.tg_evidencia_es_de_la_orden();
 
--- ── 4 · GRANTS ────────────────────────────────────────────────────────
+-- ── 4 · PREFERENCIAS DE PANEL ─────────────────────────────────────────
+-- Qué gráficos quiere ver cada persona en su dashboard. Va en la fila del
+-- usuario y no en una tabla aparte porque es un dato por usuario y no
+-- crece: una tabla para esto sería una junta más en cada carga.
+--
+-- Nullable a propósito: null significa "nunca lo he tocado" y entonces
+-- manda lo que corresponde a sus roles. Un array vacío es una decisión
+-- distinta —"no quiero ver nada"— y hay que poder distinguirlas.
+alter table public.usuario
+  add column if not exists paneles jsonb;
+
+comment on column public.usuario.paneles is
+  'Gráficos elegidos para su dashboard. null = usar los de sus roles; [] = no quiere ninguno.';
+
+-- Cada quien cambia SÓLO su propia preferencia, y no tendría sentido
+-- pedirle permiso al Administrador para elegir qué gráficos ve uno.
+--
+-- Pero una política `for update` concedería la FILA entera: con ella, un
+-- usuario podría cambiarse el nombre, el correo o el área. RLS no sabe de
+-- columnas, así que —igual que con `cambiar_estado_orden`— esto es una
+-- función que comprueba la identidad y toca UNA columna.
+create or replace function public.fijar_paneles(p_paneles jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tenant uuid := public.current_tenant_id();
+begin
+  if v_tenant is null or auth.uid() is null then
+    raise exception 'Sin sesión válida' using errcode = '42501';
+  end if;
+
+  if p_paneles is not null and jsonb_typeof(p_paneles) <> 'array' then
+    raise exception 'La selección de paneles tiene que ser una lista'
+      using errcode = '22023';
+  end if;
+
+  -- security definer salta RLS, así que el laboratorio y la identidad se
+  -- comprueban aquí a mano.
+  update public.usuario
+     set paneles = p_paneles
+   where id = auth.uid() and tenant_id = v_tenant;
+
+  if not found then
+    raise exception 'Esa cuenta no existe en este laboratorio' using errcode = '42501';
+  end if;
+end;
+$$;
+
+comment on function public.fijar_paneles is
+  'Guarda la selección de gráficos del propio usuario. Toca una columna, sin abrirle la fila entera.';
+
+-- ── 5 · GRANTS ────────────────────────────────────────────────────────
 grant select, insert, update, delete on all tables in schema public to authenticated, service_role;
 grant usage, select on all sequences in schema public to authenticated, service_role;
 grant execute on all functions in schema public to anon, authenticated, service_role;

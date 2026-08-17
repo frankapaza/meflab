@@ -1501,6 +1501,7 @@ export type Database = {
           email: string
           id: string
           nombre: string
+          paneles: Json | null
           sede_id: string | null
           telefono: string | null
           tenant_id: string
@@ -1515,6 +1516,7 @@ export type Database = {
           email: string
           id: string
           nombre: string
+          paneles?: Json | null
           sede_id?: string | null
           telefono?: string | null
           tenant_id: string
@@ -1529,6 +1531,7 @@ export type Database = {
           email?: string
           id?: string
           nombre?: string
+          paneles?: Json | null
           sede_id?: string | null
           telefono?: string | null
           tenant_id?: string
@@ -1719,6 +1722,7 @@ export type Database = {
         Args: { p_flujo: string; p_procesos: string[] }
         Returns: number
       }
+      fijar_paneles: { Args: { p_paneles: Json }; Returns: undefined }
       generar_codigo_orden: { Args: { p_tenant: string }; Returns: string }
       instanciar_etapas: { Args: { p_orden: string }; Returns: number }
       jwt_claims: { Args: never; Returns: Json }

@@ -201,31 +201,40 @@ Orden de construcción. Cada ítem es entregable y demostrable por separado.
 | 6 | Como Administrador, defino listas de precio y asigno una a cada cliente | 5 | 5 | ■ hecha |
 | 7 | Como Administrador, configuro procesos y flujos por tipo de trabajo | 8 | 5 | ■ hecha |
 | 8 | Como Recepción, registro una orden con servicios, pieza (odontograma), color, material y fechas | 13 | 4, 6 | ■ hecha |
-| 9 | Como Recepción, adjunto fotos, STL y prescripciones a la orden | 8 | 8 | ○ pendiente |
+| 9 | Como Recepción, adjunto fotos, STL y prescripciones a la orden | 8 | 8 | ■ hecha |
 | 10 | Como sistema, genero el número de orden e instancio las etapas del flujo | 5 | 7, 8 | ■ hecha · dentro de `registrar_orden` |
-| 11 | Como responsable de producción, veo el kanban con semáforo de fechas y filtros | 8 | 10 | ◑ parcial · hay tablero con semáforo, falta el kanban por columnas y los filtros |
+| 11 | Como responsable de producción, veo el kanban con semáforo de fechas y filtros | 8 | 10 | ■ hecha |
 | 12 | Como responsable de producción, asigno etapas a los técnicos según su carga | 8 | 11 | ■ hecha |
 | 13 | Como Técnico, veo mis tareas y registro inicio y fin | 5 | 12 | ■ hecha |
 | 14 | Como responsable de producción, cambio el estado de la orden y queda historial | 5 | 11 | ■ hecha |
-| 15 | Como Recepción, registro la entrega con receptor y evidencia | 5 | 14 | ◑ parcial · receptor y método sí; la evidencia adjunta depende de la 9 |
-| 16 | Como cualquier usuario, veo **mi dashboard con gráficos**: KPIs con tendencia, embudo, carga y alertas | 13 | 13, 14 | ◑ parcial · seis gráficos con datos reales; falta configurarlo por rol |
+| 15 | Como Recepción, registro la entrega con receptor y evidencia | 5 | 14 | ■ hecha |
+| 16 | Como cualquier usuario, veo **mi dashboard con gráficos**: KPIs con tendencia, embudo, carga y alertas | 13 | 13, 14 | ■ hecha |
 | 17 | Como Recepción, busco cualquier orden, doctor o paciente desde el buscador global | 5 | 8 | ■ hecha |
 | 18 | Como Recepción, abro la **vista 360°** de un doctor desde su ficha en la lista | 5 | 3, 8 | ■ hecha |
 
 **Total: 127 puntos.** A 15 puntos/semana con 2 desarrolladores → **≈9 semanas**.
 
-**Avance al 16/08/2026: 13 historias completas y 3 parciales.** Lo que falta
-para cerrar el MVP:
+**Avance al 16/08/2026: las 18 historias están construidas**, verificadas en
+el navegador y cubiertas por pruebas. 148 pruebas unitarias y 33
+comprobaciones SQL que atacan la base directamente.
 
-| Falta | Pts | Por qué no está |
-|---|---|---|
-| **9 · Adjuntos** (fotos, STL, prescripciones) | 8 | Necesita Supabase Storage con política por `tenant_id` en el primer segmento de la ruta. La tabla `archivo` y la convención ya existen desde la Fase 0; falta el bucket, la política y la subida. |
-| **11 · Kanban por columnas y filtros** | 4 de 8 | El tablero ya existe con semáforo de fechas y glifos; falta agruparlo por estado en columnas y filtrar por doctor, técnico y prioridad. |
-| **15 · Evidencia de entrega** | 2 de 5 | Depende de la 9: sin adjuntos no hay foto de evidencia. |
-| **16 · Dashboard configurable por rol** | 4 de 13 | Los seis gráficos están con datos reales; falta que cada rol elija los suyos y que se guarde la preferencia. |
+Decisiones tomadas al construir que conviene tener a mano:
 
-Todo lo demás del MVP está construido, verificado en el navegador y cubierto
-por pruebas.
+| Decisión | Dónde vive |
+|---|---|
+| Los adjuntos aceptan **100 MiB** y no los 50 de fábrica: un STL de arcada completa sin comprimir pesa 40–80 MB | `supabase/config.toml` y el bucket en `0003_almacenamiento.sql` |
+| Formatos admitidos: fotos (JPG, PNG, HEIC, WEBP), escaneos (STL, PLY, OBJ, DCM, ZIP) y PDF | `lib/validaciones/archivo.ts` y el bucket |
+| El aislamiento entre laboratorios en Storage se apoya en la **ruta**, no en una columna: `{tenant_id}/{orden_id}/{uuid}-{nombre}` | `0003_almacenamiento.sql`, prueba 2 |
+| El precio de una orden lo resuelve la base, nunca el navegador | `precio_para_cliente()` |
+| Lo que se guarda es el precio **tecleado**; el valor de venta se deriva. Es lo que hace que guardar dos veces no vuelva a dividir | `servicio.precio_capturado`, prueba 12a |
+
+**Lo que queda para producción no es código:**
+
+- Cuentas de Vercel y Sentry (0.8b y 0.9b de la Fase 0).
+- Proyectos Supabase `meflab-dev` y `meflab-prod` en São Paulo. Subir es
+  `supabase link` + `db push`: migraciones y seed están probados.
+- Las cuatro decisiones abiertas del §8, dos de ellas con límite en la
+  semana 12.
 
 ### Backlog en espera — se activa cuando se definan las áreas
 
