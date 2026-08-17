@@ -21,6 +21,7 @@ export async function registrarEntrega(
       receptor: formData.get("receptor") ?? "",
       metodo: formData.get("metodo") ?? "mostrador",
       observaciones: formData.get("observaciones") ?? "",
+      evidenciaId: formData.get("evidenciaId") ?? "",
     });
 
     const supabase = await crearClienteServidor();
@@ -31,6 +32,7 @@ export async function registrarEntrega(
       receptor: datos.receptor,
       metodo: datos.metodo,
       observaciones: datos.observaciones || null,
+      evidencia_id: datos.evidenciaId || null,
       created_by: ctx.usuarioId,
     });
 
@@ -38,6 +40,12 @@ export async function registrarEntrega(
       // unique (orden_id): una orden se entrega una vez.
       if (error.code === "23505") {
         return { ok: false, mensaje: "Esa orden ya estaba registrada como entregada." };
+      }
+      if (error.message.includes("misma orden")) {
+        return {
+          ok: false,
+          mensaje: "Esa evidencia es un adjunto de otra orden.",
+        };
       }
       return { ok: false, mensaje: error.message };
     }

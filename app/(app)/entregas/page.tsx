@@ -31,9 +31,16 @@ type Orden = {
   doctor: { nombre: string } | null;
   estado: { nombre: string; glifo: string; fase: string } | null;
   tarea_produccion: { estado: string }[];
+  archivo: { id: string; nombre: string }[];
   // Objeto, no lista: `entrega` lleva `unique (orden_id)`, así que PostgREST
   // la resuelve como relación a UNO y devuelve null cuando no la hay.
-  entrega: { id: string; entregado_en: string; receptor: string; metodo: string } | null;
+  entrega: {
+    id: string;
+    entregado_en: string;
+    receptor: string;
+    metodo: string;
+    evidencia_id: string | null;
+  } | null;
 };
 
 const ETIQUETA_METODO = Object.fromEntries(METODOS.map((m) => [m.valor, m.etiqueta]));
@@ -47,7 +54,7 @@ export default async function EntregasPage() {
   const { data } = await supabase
     .from("orden_trabajo")
     .select(
-      "id, codigo, fecha_comprometida, cliente:cliente_id(razon_social), doctor:doctor_id(nombre), estado:estado_id(nombre, glifo, fase), tarea_produccion(estado), entrega(id, entregado_en, receptor, metodo)",
+      "id, codigo, fecha_comprometida, cliente:cliente_id(razon_social), doctor:doctor_id(nombre), estado:estado_id(nombre, glifo, fase), tarea_produccion(estado), archivo(id, nombre), entrega(id, entregado_en, receptor, metodo, evidencia_id)",
     )
     .order("fecha_comprometida");
 
@@ -149,6 +156,7 @@ export default async function EntregasPage() {
                       ordenId={o.id}
                       codigo={o.codigo}
                       cliente={o.cliente?.razon_social ?? ""}
+                      evidencias={o.archivo ?? []}
                     >
                       <button className="h-[30px] shrink-0 rounded-r1 bg-acc px-s3 text-sm font-semibold text-acc-on">
                         Entregar
@@ -188,6 +196,15 @@ export default async function EntregasPage() {
                   </span>
                   <span className="shrink-0 font-mono text-xs text-ink-3">
                     {ETIQUETA_METODO[e.metodo] ?? e.metodo}
+                  </span>
+                  {/* Se dice cuando NO hay evidencia, no sólo cuando la
+                      hay: el hueco silencioso es lo que hace creer que se
+                      registró algo que no se registró. */}
+                  <span
+                    className={`shrink-0 font-mono text-xs ${e.evidencia_id ? "text-ok" : "text-ink-3"}`}
+                  >
+                    <span aria-hidden="true">{e.evidencia_id ? "◉" : "○"}</span>{" "}
+                    {e.evidencia_id ? "con evidencia" : "sin evidencia"}
                   </span>
                   <span className="shrink-0 font-mono text-sm tabular-nums text-ok">
                     <span aria-hidden="true">■</span>{" "}

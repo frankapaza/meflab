@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useId, useRef, useState } from "react";
 
 import {
@@ -18,15 +19,20 @@ import { registrarEntrega, type Resultado } from "./acciones";
 
 const INICIAL: Resultado = { ok: false, mensaje: null };
 
+export type OpcionEvidencia = { id: string; nombre: string };
+
 export function DialogoEntrega({
   ordenId,
   codigo,
   cliente,
+  evidencias,
   children,
 }: {
   ordenId: string;
   codigo: string;
   cliente: string;
+  /** Adjuntos de ESTA orden que pueden servir de prueba de entrega. */
+  evidencias: OpcionEvidencia[];
   children: React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -36,6 +42,7 @@ export function DialogoEntrega({
   const [receptor, setReceptor] = useState("");
   const [metodo, setMetodo] = useState("mostrador");
   const [observaciones, setObservaciones] = useState("");
+  const [evidenciaId, setEvidenciaId] = useState("");
 
   const [estado, accion, enviando] = useActionState(
     async (previo: Resultado, formData: FormData) => {
@@ -98,6 +105,36 @@ export function DialogoEntrega({
                 </option>
               ))}
             </select>
+          </Campo>
+
+          {/* La evidencia sale de los adjuntos de ESTA orden, no de un
+              subidor aparte: así no se puede adjuntar por error la foto de
+              otro trabajo, y la base lo comprueba además con un trigger. */}
+          <Campo etiqueta="Evidencia" id={`${idForm}-e`}>
+            {evidencias.length === 0 ? (
+              <p className="rounded-r1 border border-dashed border-line-2 px-s3 py-s2 text-sm text-ink-3">
+                Esta orden no tiene adjuntos. Súbelos desde{" "}
+                <Link href={`/trabajos/${ordenId}`} className="text-acc hover:underline">
+                  su ficha
+                </Link>{" "}
+                si quieres dejar una foto como prueba.
+              </p>
+            ) : (
+              <select
+                id={`${idForm}-e`}
+                name="evidenciaId"
+                value={evidenciaId}
+                onChange={(e) => setEvidenciaId(e.target.value)}
+                className="h-[38px] w-full rounded-r1 border border-line bg-card-2 px-s2 text-base outline-none focus-visible:border-acc"
+              >
+                <option value="">Sin evidencia adjunta</option>
+                {evidencias.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
           </Campo>
 
           <Campo etiqueta="Observaciones" id={`${idForm}-o`}>

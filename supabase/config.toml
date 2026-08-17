@@ -115,7 +115,13 @@ port = 54324
 [storage]
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
+#
+# 100 MiB y no los 50 de fábrica: un escaneo STL de arcada completa sin
+# comprimir pesa entre 40 y 80 MB, y con el límite por defecto la mitad de
+# los escaneos se rechazarían en el mostrador. El límite REAL por archivo
+# lo pone el bucket (ver 0003_almacenamiento.sql); esto es el techo global
+# que no puede superar.
+file_size_limit = "100MiB"
 
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
