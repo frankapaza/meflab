@@ -28,6 +28,10 @@ const NAV: GrupoNav[] = [
     grupo: "PRODUCCIÓN",
     items: [
       { href: "/trabajos", etiqueta: "Tablero" },
+      // Estuvo construida y fuera del menú: se llegaba sólo tecleando la
+      // URL. Una pantalla sin entrada en el menú no existe para quien la
+      // necesita.
+      { href: "/produccion", etiqueta: "Asignación de etapas" },
       { href: "/produccion/mis-tareas", etiqueta: "Mis tareas" },
       { href: "/entregas", etiqueta: "Entregas" },
     ],
@@ -65,6 +69,8 @@ const NAV: GrupoNav[] = [
       { href: "/configuracion", etiqueta: "Catálogo y tarifas" },
       { href: "/configuracion/listas", etiqueta: "Listas de precio" },
       { href: "/configuracion/produccion", etiqueta: "Procesos y flujos" },
+      // Sin marca de fase a propósito: no está pendiente de construirse,
+      // está esperando que el laboratorio decida cuántas áreas tiene.
       { href: "/configuracion/areas", etiqueta: "Áreas y competencias" },
       { href: "/configuracion/usuarios", etiqueta: "Usuarios y permisos" },
       { href: "/auditoria", etiqueta: "Auditoría", fase: "3" },
