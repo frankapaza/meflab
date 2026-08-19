@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Hoja de accesos local. Hoy sólo lleva credenciales de desarrollo, pero es
+# el archivo donde acaban pegándose las de producción: fuera del repositorio
+# desde el primer día, para que ese día no haya que acordarse.
+credenciales.txt
+
 # vercel
 .vercel
 
