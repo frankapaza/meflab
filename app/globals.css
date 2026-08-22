@@ -43,6 +43,7 @@
   --warn-bg: #fbeed6;
   --err: #a3271c;
   --err-bg: #fce9e6;
+  --err-on: #ffffff; /* 7,33:1 sobre --err */
 
   /* paleta de DATOS · no es el verde de marca a propósito: con croma 0,086
      el acento se lee gris como marca de gráfico. Estos tres pasan el
@@ -116,6 +117,9 @@
   --warn-bg: #31240a;
   --err: #fb7185;
   --err-bg: #331419;
+  /* En oscuro --err es rosa claro: el texto encima tiene que ser oscuro,
+     no blanco. Invertirlo daría 2:1 y un botón ilegible. */
+  --err-on: #1a0508; /* 7,30:1 sobre --err */
 
   /* Los mismos tres, re-escalonados contra la superficie oscura. No es un
      volteo automático: se eligen y se validan aparte. */
@@ -245,6 +249,7 @@
   --color-warn-bg: var(--warn-bg);
   --color-err: var(--err);
   --color-err-bg: var(--err-bg);
+  --color-err-on: var(--err-on);
 
   --color-st-1: var(--st-1);
   --color-st-2: var(--st-2);
@@ -424,4 +429,36 @@
   --chart-3: var(--sc-3);
   --chart-4: var(--sq-3);
   --chart-5: var(--sq-5);
+}
+
+/* ── impresión ─────────────────────────────────────────────────────────
+   Un comprobante se entrega en papel. En papel no hay tema oscuro, ni
+   sombras, ni fondos de color: hay tinta cara y una impresora que a
+   menudo es en blanco y negro. Se fuerza el fondo blanco y la tinta
+   negra en vez de confiar en los tokens del tema activo. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --card-2: #ffffff;
+    --ink: #000000;
+    --ink-2: #1a1a1a;
+    --ink-3: #444444;
+    --line: #999999;
+    --line-2: #999999;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* Una tabla partida a la mitad entre dos hojas obliga a cotejar dos
+     papeles para leer un importe. */
+  table, tr, article {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }

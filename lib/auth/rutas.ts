@@ -40,6 +40,9 @@ const REGLAS: Record<string, readonly string[]> = {
   "/produccion": ["administrador", "gerencia", "lider_laboratorio", "lider_area", "tecnico"],
   "/produccion/mis-tareas": ["administrador", "lider_area", "tecnico"],
   "/entregas": ["administrador", "gerencia", "lider_laboratorio", "recepcion", "lider_area"],
+  // Inspeccionar es de jefatura del taller. Quien fabrica no se aprueba
+  // a sí mismo: sería juez y parte.
+  "/calidad": ["administrador", "gerencia", "lider_laboratorio", "lider_area"],
 
   // Comercial
   "/clientes": ["administrador", "gerencia", "recepcion"],
@@ -51,6 +54,10 @@ const REGLAS: Record<string, readonly string[]> = {
   "/pagos": ["administrador", "gerencia", "recepcion"],
   "/caja": ["administrador", "gerencia", "recepcion"],
   "/cobranzas": ["administrador", "gerencia", "recepcion"],
+  // El comprobante imprimible. Mismos roles que facturación: quien puede
+  // ver el documento en pantalla puede entregárselo al cliente.
+  "/comprobante": ["administrador", "gerencia", "recepcion"],
+  "/estado-de-cuenta": ["administrador", "gerencia", "recepcion"],
 
   // Almacén
   "/inventario": INTERNOS,

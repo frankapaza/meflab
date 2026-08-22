@@ -31,8 +31,15 @@ insert into public.configuracion (tenant_id, clave, valor, descripcion) values
    '{"puntualidad":0.40,"morosidad":0.25,"frecuencia":0.15,"recencia":0.10,"volumen":0.10,"retrabajo":-0.20}',
    'Pesos de la fórmula de score (M-02)');
 
+-- Sin serie de FACTURA y BOLETA no se puede emitir nada, y la pantalla de
+-- facturación queda inservible sin decir por qué. Las series de venta las
+-- autoriza SUNAT: éstas son las de desarrollo, no valen para producción.
 insert into public.serie (tenant_id, tipo_doc, serie) values
-  ('a0000000-0000-4000-8000-000000000001', 'OT', to_char(now(), 'YYYY'));
+  ('a0000000-0000-4000-8000-000000000001', 'OT', to_char(now(), 'YYYY')),
+  ('a0000000-0000-4000-8000-000000000001', 'FACTURA', 'F001'),
+  ('a0000000-0000-4000-8000-000000000001', 'BOLETA', 'B001'),
+  ('a0000000-0000-4000-8000-000000000001', 'NOTA_CREDITO', 'FC01'),
+  ('a0000000-0000-4000-8000-000000000001', 'NOTA_DEBITO', 'FD01');
 
 -- ── los 10 estados del ciclo real (M-01) ──────────────────────────────
 -- Cada uno con su GLIFO: es el glifo, no el color, lo que permite leer el

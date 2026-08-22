@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Barras, Kpi, Linea, Medidor, SERIE, type Punto } from "@/components/graficos";
 import { contextoActual } from "@/lib/auth/permisos";
 import { leerSeleccion, panelesPorDefecto } from "@/lib/dominio/panel";
+import { TRAMOS } from "@/lib/validaciones/facturacion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { horasLegibles } from "@/lib/validaciones/produccion";
 
@@ -53,8 +54,20 @@ export default async function Inicio() {
 
   const supabase = await crearClienteServidor();
 
-  const [{ data: ordenes }, { data: tareas }, { data: usuarios }, { data: yo }] =
-    await Promise.all([
+  // Se calcula antes de consultar porque el filtro del mes viaja a la base:
+  // traer todos los documentos para descartarlos aquí crece con los años.
+  const hoy = hoyLima();
+  const mes = hoy.slice(0, 7);
+
+  const [
+    { data: ordenes },
+    { data: tareas },
+    { data: usuarios },
+    { data: yo },
+    { data: cartera },
+    { data: docsMes },
+    { data: pendienteFacturar },
+  ] = await Promise.all([
     supabase
       .from("orden_trabajo")
       .select(
@@ -66,6 +79,20 @@ export default async function Inicio() {
       .select("estado, tecnico_id, horas_estimadas, terminada_en"),
     supabase.from("usuario").select("id, nombre").eq("activo", true),
     supabase.from("usuario").select("paneles").eq("id", ctx.usuarioId).maybeSingle(),
+    // La deuda del dashboard sale de v_cartera, la MISMA vista que lee
+    // cobranza. Es lo que garantiza que las dos pantallas enseñen la misma
+    // cifra — el descuadre de H-01 nació justo de calcularla por separado.
+    supabase.from("v_cartera").select("saldo, tramo"),
+    // Facturado del mes se cuenta de los DOCUMENTOS, no de las órdenes. Una
+    // orden recibida todavía no es una venta: lo es cuando se emite el
+    // comprobante. Contarla antes infla la cifra y contradice a D-02.
+    supabase
+      .from("documento_venta")
+      .select("subtotal")
+      .eq("estado", "emitido")
+      .gte("fecha_emision", `${mes}-01`),
+    // RF-145. No es deuda: es trabajo entregado que aún no se ha facturado.
+    supabase.from("v_pendiente_facturar").select("orden_id, valor_venta"),
   ]);
 
   // null significa "nunca lo he tocado" y manda lo de sus roles; una lista
@@ -79,7 +106,6 @@ export default async function Inicio() {
   const listaTareas = (tareas ?? []) as unknown as Tarea[];
   const nombreUsuario = new Map((usuarios ?? []).map((u) => [u.id, u.nombre]));
 
-  const hoy = hoyLima();
   const importe = (o: Orden) =>
     (o.detalle_trabajo ?? []).reduce(
       (s, d) => s + Number(d.cantidad) * Number(d.precio_unitario),
@@ -103,7 +129,6 @@ export default async function Inicio() {
   const urgentes = enCurso.filter((o) => o.prioridad === "urgente").length;
 
   /* ── del mes ─────────────────────────────────────────────────────── */
-  const mes = hoy.slice(0, 7);
   const mesAnterior = (() => {
     const [a, m] = mes.split("-").map(Number);
     return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`;
@@ -171,6 +196,32 @@ export default async function Inicio() {
     .map(([etiqueta, valor]) => ({ etiqueta, valor }))
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 5);
+
+  /* ── cartera ─────────────────────────────────────────────────────── */
+  const filasCartera = (cartera ?? []) as unknown as { saldo: number; tramo: string }[];
+  const porCobrar = filasCartera.reduce((s, f) => s + Number(f.saldo), 0);
+  const vencidoTotal = filasCartera
+    .filter((f) => f.tramo !== "por_vencer")
+    .reduce((s, f) => s + Number(f.saldo), 0);
+
+  const facturadoMes = ((docsMes ?? []) as { subtotal: number }[]).reduce(
+    (s, d) => s + Number(d.subtotal),
+    0,
+  );
+
+  const filasPendientes = (pendienteFacturar ?? []) as unknown as {
+    orden_id: string;
+    valor_venta: number;
+  }[];
+  const porFacturar = filasPendientes.reduce((s, f) => s + Number(f.valor_venta), 0);
+
+  const agingBarras = TRAMOS.map((t) => ({
+    etiqueta: t.etiqueta,
+    glifo: t.glifo,
+    valor: filasCartera
+      .filter((f) => f.tramo === t.id)
+      .reduce((s, f) => s + Number(f.saldo), 0),
+  }));
 
   /* ── puntualidad del mes ─────────────────────────────────────────── */
   const entregadasMes = lista.filter((o) => o.fecha_entrega?.slice(0, 7) === mes);
@@ -325,7 +376,56 @@ export default async function Inicio() {
           tipoMeta="techo"
         />
         ) : null}
+
+        {paneles.has("aging") ? (
+        <Barras
+          titulo="Aging de la deuda"
+          descripcion="Cuánto se debe en cada tramo de mora. Sale de v_cartera, igual que la pantalla de Cobranza."
+          datos={agingBarras}
+          formato={(n) => soles.format(n)}
+          color={SERIE[1]}
+        />
+        ) : null}
       </div>
+
+      {paneles.has("cartera") ? (
+        <section className="flex flex-col gap-s3">
+          <h2 className="font-mono text-xs uppercase tracking-wide text-ink-3">
+            Cartera
+          </h2>
+          <div className="grid gap-s3 sm:grid-cols-2 lg:grid-cols-4">
+            <Kpi
+              etiqueta="Por cobrar"
+              valor={soles.format(porCobrar)}
+              bueno="down"
+              nota={`${filasCartera.length} documentos abiertos`}
+            />
+            <Kpi
+              etiqueta="Vencido"
+              valor={soles.format(vencidoTotal)}
+              bueno="down"
+              nota={
+                porCobrar > 0
+                  ? `${Math.round((vencidoTotal / porCobrar) * 100)} % de la cartera`
+                  : "nada vencido"
+              }
+            />
+            <Kpi
+              etiqueta="Facturado del mes"
+              valor={soles.format(facturadoMes)}
+              nota="valor de venta sin IGV"
+            />
+            {/* No lleva `bueno`: una cola alta de por facturar es dinero que
+                el laboratorio ya se ganó y todavía no ha pedido. No es ni
+                buena ni mala hasta que se mira su antigüedad. */}
+            <Kpi
+              etiqueta="Por facturar"
+              valor={soles.format(porFacturar)}
+              nota={`${filasPendientes.length} entregas · no es deuda`}
+            />
+          </div>
+        </section>
+      ) : null}
 
       {paneles.size === 0 ? (
         <div className="grid min-h-[220px] place-items-center rounded-r2 border border-dashed border-line-2 p-s6">
@@ -337,10 +437,10 @@ export default async function Inicio() {
       ) : null}
 
       <p className="text-sm leading-relaxed text-ink-3">
-        Ninguna cifra de aquí es deuda. Lo que se ve es valor de venta de los
-        trabajos; la deuda nace del comprobante y se leerá de una sola fuente
-        en la Fase 2 — que es justamente lo que este proyecto existe para
-        cerrar.
+        Sólo «Por cobrar» y «Vencido» son deuda, y salen de{" "}
+        <code className="font-mono text-xs">v_cartera</code>, la misma fuente
+        que lee Cobranza. Lo demás es valor de venta de los trabajos: parecido,
+        pero no es lo que nadie debe.
       </p>
     </div>
   );

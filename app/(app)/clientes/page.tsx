@@ -4,6 +4,7 @@ import { contextoActual } from "@/lib/auth/permisos";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { ETIQUETA_TIPO, type TipoCliente } from "@/lib/validaciones/cliente";
 
+import { AlternarBloqueo } from "./bloqueo";
 import { DialogoCliente, type ClienteEditable } from "./dialogo-cliente";
 
 export const metadata = { title: "Clientes · MEFLAB" };
@@ -21,11 +22,11 @@ export default async function ClientesPage() {
   const supabase = await crearClienteServidor();
 
   // Todo pasa por RLS: sólo el propio laboratorio.
-  const [{ data: clientes }, { data: listas }] = await Promise.all([
+  const [{ data: clientes }, { data: listas }, { data: deudas }] = await Promise.all([
     supabase
       .from("cliente")
       .select(
-        "id, tipo, razon_social, tipo_documento, numero_documento, direccion, email, telefono, dias_credito, linea_credito, lista_precio_id, bloqueado, motivo_bloqueo, lista:lista_precio_id(nombre), doctor(count)",
+        "id, tipo, razon_social, tipo_documento, numero_documento, direccion, email, telefono, dias_credito, linea_credito, lista_precio_id, bloqueado, motivo_bloqueo, score, segmento, lista:lista_precio_id(nombre), doctor(count)",
       )
       .order("razon_social"),
     supabase
@@ -33,10 +34,28 @@ export default async function ClientesPage() {
       .select("id, nombre, precios_incluyen_igv")
       .eq("activo", true)
       .order("nombre"),
+    // D-02/H-01: la deuda NO se calcula aquí. Sale de v_deuda_cliente, que
+    // es un agregado de v_cartera — la misma fuente que lee Cobranza y el
+    // dashboard. Sumar saldos de trabajos en esta pantalla es literalmente
+    // cómo el sistema anterior acabó enseñando tres cifras distintas.
+    supabase
+      .from("v_deuda_cliente")
+      .select("cliente_id, deuda_total, vencido, documentos_abiertos, mora_maxima"),
   ]);
 
   const filas = clientes ?? [];
+
+  const deudaPorCliente = new Map(
+    ((deudas ?? []) as unknown as {
+      cliente_id: string;
+      deuda_total: number;
+      vencido: number;
+      documentos_abiertos: number;
+      mora_maxima: number;
+    }[]).map((d) => [d.cliente_id, d]),
+  );
   const puedeEditar = ctx.roles.some((r) => ["recepcion", "administrador"].includes(r));
+  const puedeBloquear = ctx.roles.some((r) => ["gerencia", "administrador"].includes(r));
 
   return (
     <div className="flex flex-col gap-s4 p-s6">
@@ -109,6 +128,8 @@ export default async function ClientesPage() {
                   <th className="px-pad-x py-s2 font-medium">Documento</th>
                   <th className="px-pad-x py-s2 font-medium">Condiciones</th>
                   <th className="px-pad-x py-s2 text-right font-medium">Línea</th>
+                  <th className="px-pad-x py-s2 text-right font-medium">Debe</th>
+                  <th className="px-pad-x py-s2 font-medium">Score</th>
                   <th className="px-pad-x py-s2 font-medium">Estado</th>
                   {puedeEditar ? (
                     <th className="px-pad-x py-s2 text-right font-medium">Acciones</th>
@@ -131,6 +152,7 @@ export default async function ClientesPage() {
                     listaPrecioId: c.lista_precio_id,
                   };
                   const doctores = (c.doctor as unknown as { count: number }[])?.[0]?.count ?? 0;
+                  const deuda = deudaPorCliente.get(c.id);
 
                   return (
                     <tr key={c.id} className="border-b border-line last:border-0">
@@ -174,6 +196,66 @@ export default async function ClientesPage() {
                         )}
                       </td>
 
+                      {/* La mora va con glifo además de color: quien no
+                          distingue el rojo tiene que poder verla igual. */}
+                      <td className="px-pad-x py-s3 text-right">
+                        {!deuda ? (
+                          <span className="font-mono text-sm text-ink-3">—</span>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <span className="font-mono text-sm font-semibold tabular-nums">
+                              {soles.format(Number(deuda.deuda_total))}
+                            </span>
+                            <span
+                              className={`font-mono text-xs ${
+                                Number(deuda.vencido) > 0 ? "text-warn" : "text-ink-3"
+                              }`}
+                            >
+                              {Number(deuda.vencido) > 0 ? (
+                                <>
+                                  <span aria-hidden="true">▲</span>{" "}
+                                  {soles.format(Number(deuda.vencido))} vencido
+                                </>
+                              ) : (
+                                `${deuda.documentos_abiertos} al día`
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* M-02. Van las estrellas Y el número: contar cinco
+                          glifos de un vistazo es más lento que leer un
+                          dígito, y fotocopiado en gris las estrellas
+                          llenas y vacías no se distinguen. */}
+                      <td className="px-pad-x py-s3">
+                        {c.score == null ? (
+                          <span className="font-mono text-xs text-ink-3">sin calcular</span>
+                        ) : (
+                          <div className="flex min-w-0 flex-col">
+                            <span className="font-mono text-sm tabular-nums">
+                              <span aria-hidden="true">
+                                {"★".repeat(c.score)}
+                                <span className="text-ink-3">{"☆".repeat(5 - c.score)}</span>
+                              </span>{" "}
+                              {c.score}/5
+                            </span>
+                            {c.segmento ? (
+                              <span
+                                className={
+                                  c.segmento === "moroso"
+                                    ? "font-mono text-xs uppercase text-warn"
+                                    : "font-mono text-xs uppercase text-ink-3"
+                                }
+                              >
+                                {c.segmento === "moroso" ? "▲ " : ""}
+                                {c.segmento}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+                      </td>
+
                       <td className="px-pad-x py-s3">
                         {c.bloqueado ? (
                           <span
@@ -191,11 +273,32 @@ export default async function ClientesPage() {
 
                       {puedeEditar ? (
                         <td className="px-pad-x py-s3 text-right">
-                          <DialogoCliente cliente={editable} listas={listas ?? []}>
-                            <button className="h-[30px] rounded-r1 border border-line bg-card px-s3 text-sm text-ink hover:bg-fill">
-                              Editar
-                            </button>
-                          </DialogoCliente>
+                          <div className="flex justify-end gap-s2">
+                            {/* El estado de cuenta es lo que se le manda al
+                                doctor cuando discute una cifra. */}
+                            <a
+                              href={`/estado-de-cuenta/${c.id}`}
+                              className="grid h-[30px] place-items-center rounded-r1 border border-line bg-card px-s3 text-sm text-ink hover:bg-fill"
+                            >
+                              Estado de cuenta
+                            </a>
+                            <DialogoCliente cliente={editable} listas={listas ?? []}>
+                              <button className="h-[30px] rounded-r1 border border-line bg-card px-s3 text-sm text-ink hover:bg-fill">
+                                Editar
+                              </button>
+                            </DialogoCliente>
+                            {/* El bloqueo comercial es de Gerencia y
+                                Administración; Recepción no se autoriza
+                                sola a dejar de vender a alguien. */}
+                            {puedeBloquear ? (
+                              <AlternarBloqueo
+                                clienteId={c.id}
+                                razonSocial={c.razon_social}
+                                bloqueado={c.bloqueado}
+                                motivoActual={c.motivo_bloqueo}
+                              />
+                            ) : null}
+                          </div>
                         </td>
                       ) : null}
                     </tr>
@@ -207,14 +310,12 @@ export default async function ClientesPage() {
         )}
       </div>
 
-      {/* D-02: aquí NO hay columna de deuda a propósito. La deuda nace del
-          documento de venta y se lee de v_cartera, que llega en la Fase 2.
-          Poner ahora una cifra calculada de otra forma es exactamente el
-          hallazgo H-01 que este proyecto existe para cerrar. */}
-      <p className="text-sm text-ink-3">
-        La deuda de cada cliente aparecerá en la Fase 2, leída de una sola
-        fuente. Hasta entonces no se muestra ninguna cifra: dos formas de
-        calcularla es como se acaba con tres cifras distintas para lo mismo.
+      <p className="text-sm leading-relaxed text-ink-3">
+        La columna «Debe» sale de{" "}
+        <code className="font-mono text-xs">v_deuda_cliente</code>, un agregado
+        de la misma <code className="font-mono text-xs">v_cartera</code> que
+        lee Cobranza. Un trabajo entregado y sin facturar todavía no cuenta
+        aquí: no es deuda hasta que hay comprobante.
       </p>
     </div>
   );

@@ -21,7 +21,9 @@ export type Panel =
   | "carga"
   | "doctores"
   | "puntualidad"
-  | "capacidad";
+  | "capacidad"
+  | "cartera"
+  | "aging";
 
 export const PANELES: { id: Panel; nombre: string; descripcion: string }[] = [
   { id: "dia", nombre: "Hoy", descripcion: "Recibidas, entregas, etapas y urgentes del día" },
@@ -32,19 +34,24 @@ export const PANELES: { id: Panel; nombre: string; descripcion: string }[] = [
   { id: "doctores", nombre: "Doctores del mes", descripcion: "Por valor de venta pedido" },
   { id: "puntualidad", nombre: "Entregas a tiempo", descripcion: "Contra la fecha comprometida" },
   { id: "capacidad", nombre: "Capacidad utilizada", descripcion: "Horas comprometidas sobre la jornada" },
+  { id: "cartera", nombre: "Cartera", descripcion: "Por cobrar y vencido, leídos de v_cartera" },
+  { id: "aging", nombre: "Aging de la deuda", descripcion: "Cuánto se debe en cada tramo de mora" },
 ];
 
 const POR_ROL: Record<string, Panel[]> = {
   // Cinco números y las alertas. Nada de detalle operativo.
-  gerencia: ["mes", "serie", "doctores", "puntualidad"],
+  gerencia: ["mes", "serie", "doctores", "puntualidad", "cartera", "aging"],
   // Lo ve todo: es quien configura y quien responde de todo.
-  administrador: ["dia", "mes", "serie", "embudo", "carga", "doctores", "puntualidad", "capacidad"],
+  administrador: [
+    "dia", "mes", "serie", "embudo", "carga", "doctores", "puntualidad", "capacidad",
+    "cartera", "aging",
+  ],
   // El taller: qué entra, dónde se atasca y quién está cargado.
   lider_laboratorio: ["dia", "embudo", "carga", "capacidad", "puntualidad"],
   lider_area: ["dia", "embudo", "carga", "capacidad"],
   // El mostrador: qué entró hoy, qué se entrega y a quién se le debe una
   // respuesta. La carga del taller no es asunto suyo.
-  recepcion: ["dia", "mes", "serie", "puntualidad", "doctores"],
+  recepcion: ["dia", "mes", "serie", "puntualidad", "doctores", "cartera"],
   // El técnico tiene "Mis tareas"; el dashboard sólo le sitúa.
   tecnico: ["dia", "embudo"],
 };

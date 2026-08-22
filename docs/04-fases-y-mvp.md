@@ -78,7 +78,7 @@ Sin pantallas de negocio. Es la base sobre la que todo lo demás se apoya.
 | # | Entregable |
 |---|---|
 | 0.1 | Repositorio, **Next.js 16**, Tailwind v4, shadcn/ui, CI en Vercel |
-| 0.2 | Base local con Docker y migraciones `0001_core` + `0002_operacion` aplicadas y probadas. *(`0003_finanzas` es Fase 2 y `0004_calidad_inventario` Fase 3: las migraciones siguen las fases.)* Proyectos Supabase dev y prod cuando toque desplegar |
+| 0.2 | Base local con Docker y migraciones `0001_core` + `0002_operacion` aplicadas y probadas. *(`0003_almacenamiento` se sumó al aparecer el Storage; `0004_finanzas` es Fase 2 y `0005_calidad_inventario` Fase 3: las migraciones siguen las fases.)* Proyectos Supabase dev y prod cuando toque desplegar |
 | 0.3 | Auth: login, recuperación de contraseña, custom claims (`tenant_id`, **roles[]**, `area_id`) |
 | 0.4 | **`proxy.ts`** de sesión y guardas de ruta por **conjunto** de roles *(en Next 16 el middleware se llama proxy y corre en nodejs)* |
 | 0.5 | **Tokens del sistema de diseño en Tailwind v4**: color claro/oscuro, tipografía, espaciado, radios, elevación, 3 densidades |
@@ -137,17 +137,23 @@ Lo mínimo para que el laboratorio abandone el Excel y el cuaderno.
 
 ## Fase 2 · Ciclo del dinero *(8 semanas)*
 
-| # | Módulo | Alcance |
-|---|---|---|
-| 2.1 | **Facturación** | Factura y boleta con series y correlativos, IGV por línea, emisión desde una o varias órdenes, notas de crédito y débito, anulación, PDF |
-| 2.2 | **Cuentas por cobrar** | CxC generada en la emisión (D‑02), aging por tramos, línea de crédito, advertencia y bloqueo comercial con autorización |
-| 2.3 | **Pagos** | Registro con medio y referencia, **aplicación a documentos**, pagos parciales y múltiples, anticipos y saldo a favor, adjunto de voucher |
-| 2.4 | **Caja** | Apertura, movimientos por categoría, cierre con arqueo (teórico vs físico vs diferencia), sólo efectivo |
-| 2.5 | **Cobranza** | Cartera priorizada, gestión con guion por tramo de mora, resultados, promesas, agenda del día, seguimiento automático de promesas incumplidas |
-| 2.6 | **Estado de cuenta** | Documento por cliente con detalle, aging y compromisos; imprimible y enviable |
-| 2.7 | **Score y segmentación** | Implementación de la fórmula M‑02, recálculo por job |
-| 2.8 | **Dashboard financiero** | Facturado, cobrado, por cobrar, vencido, caja disponible, aging y top deudores |
-| 2.9 | **Integraciones** | Facturación electrónica vía PSE, email transaccional (Resend), WhatsApp Business |
+| | # | Módulo | Alcance | Estado |
+|---|---|---|---|---|
+| ✅ | 2.1 | **Facturación** | Factura y boleta con series y correlativos, IGV por línea, emisión desde una o varias órdenes, notas de crédito y débito, anulación, PDF | Completo. El PDF es la vista imprimible del navegador, no un PDF generado en servidor |
+| ✅ | 2.2 | **Cuentas por cobrar** | CxC generada en la emisión (D‑02), aging por tramos, línea de crédito, advertencia y bloqueo comercial con autorización | Completo |
+| ✅ | 2.3 | **Pagos** | Registro con medio y referencia, **aplicación a documentos**, pagos parciales y múltiples, anticipos y saldo a favor, adjunto de voucher | Completo salvo el adjunto del voucher, que espera a la pantalla de archivos |
+| ✅ | 2.4 | **Caja** | Apertura, movimientos por categoría, cierre con arqueo (teórico vs físico vs diferencia), sólo efectivo | Completo |
+| ✅ | 2.5 | **Cobranza** | Cartera priorizada, gestión con guion por tramo de mora, resultados, promesas, agenda del día, seguimiento automático de promesas incumplidas | Completo salvo el seguimiento automático, que es un job (`0006_jobs`) |
+| ✅ | 2.6 | **Estado de cuenta** | Documento por cliente con detalle, aging y compromisos; imprimible y enviable | Completo. «Enviable» = imprimir o guardar en PDF; el envío por correo es 2.9 |
+| ✅ | 2.7 | **Score y segmentación** | Implementación de la fórmula M‑02, recálculo por job | Fórmula completa salvo el término de retrabajo, que necesita la tabla de la Fase 3. El job queda pendiente |
+| ✅ | 2.8 | **Dashboard financiero** | Facturado, cobrado, por cobrar, vencido, caja disponible, aging y top deudores | Completo |
+| ◐ | 2.9 | **Integraciones** | Facturación electrónica vía PSE, email transaccional (Resend), WhatsApp Business | **Bloqueado**: las tres necesitan cuentas externas. Mientras tanto, el estado del comprobante ante SUNAT (hash, ticket, respuesta) **se registra a mano** en los mismos campos que usará la integración: lo tecleado hoy no habrá que migrarlo |
+
+> **Qué queda de verdad.** Sólo 2.9, que depende de que el laboratorio
+> abra las cuentas. Lo demás está construido y probado; lo que se aplaza
+> dentro de cada módulo son piezas que dependen de otra fase (el término
+> de retrabajo del score, el adjunto del voucher) o del planificador de
+> tareas (`0006_jobs`: score nocturno y promesas incumplidas).
 
 **Definición de terminado:** el dashboard, el CRM del cliente, cobranzas y facturación muestran **la misma cifra de deuda**, leída de `v_cartera`. Es la prueba de que H‑01 quedó cerrado.
 
@@ -157,17 +163,29 @@ Lo mínimo para que el laboratorio abandone el Excel y el cuaderno.
 
 ## Fase 3 · Control y calidad *(8 semanas)*
 
-| # | Módulo | Alcance |
-|---|---|---|
-| 3.1 | **Control de calidad** | Checklist configurable por servicio, inspección con resultado, evidencia fotográfica, no conformidades con causa y responsable |
-| 3.2 | **Retrabajos y garantías** | Retrabajo ligado a la orden original, tipificación de causa, política de garantía (cubierto / parcial / facturable), costo generado, KPI de retrabajo |
-| 3.3 | **Competencias y asignación sugerida** | Matriz competencia × técnico con nivel 1‑3, algoritmo de sugerencia por competencia y carga, alerta de competencia sin respaldo (AC‑01 §8) |
-| 3.4 | **Inventario** | Materiales, lotes con vencimiento, ubicación, movimientos, consumo por trabajo, umbral bajo y crítico, inventario físico con ajuste aprobado, trazabilidad |
-| 3.5 | **Costos y rentabilidad** | Costo estimado vs real (materiales + mano de obra por etapa + procesos externos), margen y rentabilidad por trabajo, doctor, servicio y periodo |
-| 3.6 | **Reportes y KPIs** | Los 9 KPIs del SRS §26, reportes productivos, comerciales, financieros y de inventario, con exportación a Excel/PDF |
-| 3.7 | **Notificaciones** | Motor de eventos con canales sistema/email/WhatsApp y preferencias por usuario |
-| 3.8 | **Auditoría** | Consulta de la bitácora con filtros por usuario, módulo, entidad y rango de fechas |
-| 3.9 | **Configuración** | Pantalla única para todos los catálogos y parámetros del laboratorio |
+**Seis de nueve módulos terminados.** Las migraciones `0005_calidad_inventario`
+y `0006_electronico_notificaciones` ponen 16 tablas, 4 vistas y 6 funciones,
+con RLS y 12 comprobaciones que pasan.
+
+| | # | Módulo | Alcance | Estado |
+|---|---|---|---|---|
+| ✅ | 3.1 | **Control de calidad** | Checklist configurable por servicio, inspección con resultado, evidencia fotográfica, no conformidades con causa y responsable | Completo salvo la evidencia fotográfica, que necesita el selector de archivos |
+| ✅ | 3.2 | **Retrabajos y garantías** | Retrabajo ligado a la orden original, tipificación de causa, política de garantía, costo generado, KPI de retrabajo | Completo. El costo se suma del material consumido; no se teclea |
+| ◐ | 3.3 | **Competencias y asignación sugerida** | Matriz competencia × técnico con nivel 1‑3, algoritmo de sugerencia por competencia y carga, alerta de competencia sin respaldo | Esquema completo. **Faltan** el algoritmo de sugerencia y la pantalla |
+| ✅ | 3.4 | **Inventario** | Materiales, lotes con vencimiento, ubicación, movimientos, consumo por trabajo, umbral bajo y crítico, inventario físico con ajuste aprobado, trazabilidad | Completo salvo la pantalla del inventario físico; la función `aprobar_inventario` ya existe y está probada |
+| ✅ | 3.5 | **Costos y rentabilidad** | Costo estimado vs real (materiales + mano de obra por etapa + procesos externos), margen y rentabilidad por trabajo, doctor, servicio y periodo | Completo salvo la comparación estimado vs real y el corte por periodo |
+| ◻ | 3.6 | **Reportes y KPIs** | Los 9 KPIs del SRS §26, reportes productivos, comerciales, financieros y de inventario, con exportación a Excel/PDF | Sin empezar. **Los 9 KPIs no están enumerados en este repositorio**: hay que recuperarlos del SRS antes de construirlos |
+| ◐ | 3.7 | **Notificaciones** | Motor de eventos con canales sistema/email/WhatsApp y preferencias por usuario | Motor, preferencias y canal `sistema` funcionando, con dos eventos que disparan solos desde la base (rechazo de calidad, stock crítico). **Falta** la bandeja en pantalla; email y WhatsApp dependen de 2.9 |
+| ✅ | 3.8 | **Auditoría** | Consulta de la bitácora con filtros por usuario, módulo, entidad y rango de fechas | Completo. Los filtros viajan en la URL, así que una consulta concreta se puede compartir |
+| ◻ | 3.9 | **Configuración** | Pantalla única para todos los catálogos y parámetros del laboratorio | Sin empezar. Hoy la configuración está repartida en cinco pantallas que funcionan |
+
+> **Dos decisiones abiertas siguen sin cerrarse** (límite semana 21) y afectan
+> a esta fase, aunque no la bloquean:
+> **quién hace el control de calidad** — el esquema deja los inspectores como
+> parámetro, con líder de laboratorio y líder de área por defecto — y
+> **qué competencias tiene cada técnico** — la matriz funciona vacía, y sin
+> competencias declaradas la sugerencia de técnico se degrada a «por carga»,
+> que es lo que hoy se hace a mano.
 
 **Definición de terminado:** Gerencia responde con el sistema las 16 preguntas del §44 del SRS.
 

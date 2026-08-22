@@ -33,6 +33,7 @@ const NAV: GrupoNav[] = [
       // necesita.
       { href: "/produccion", etiqueta: "Asignación de etapas" },
       { href: "/produccion/mis-tareas", etiqueta: "Mis tareas" },
+      { href: "/calidad", etiqueta: "Control de calidad" },
       { href: "/entregas", etiqueta: "Entregas" },
     ],
   },
@@ -47,15 +48,15 @@ const NAV: GrupoNav[] = [
   {
     grupo: "DINERO",
     items: [
-      { href: "/cobranzas", etiqueta: "Cobranza", fase: "2" },
-      { href: "/caja", etiqueta: "Caja", fase: "2" },
-      { href: "/facturacion", etiqueta: "Facturación", fase: "2" },
+      { href: "/cobranzas", etiqueta: "Cobranza" },
+      { href: "/caja", etiqueta: "Caja" },
+      { href: "/facturacion", etiqueta: "Facturación" },
     ],
   },
   {
     grupo: "ALMACÉN",
     items: [
-      { href: "/inventario", etiqueta: "Inventario", fase: "3" },
+      { href: "/inventario", etiqueta: "Inventario" },
       { href: "/compras", etiqueta: "Compras", fase: "4" },
     ],
   },
@@ -73,7 +74,7 @@ const NAV: GrupoNav[] = [
       // está esperando que el laboratorio decida cuántas áreas tiene.
       { href: "/configuracion/areas", etiqueta: "Áreas y competencias" },
       { href: "/configuracion/usuarios", etiqueta: "Usuarios y permisos" },
-      { href: "/auditoria", etiqueta: "Auditoría", fase: "3" },
+      { href: "/auditoria", etiqueta: "Auditoría" },
     ],
   },
   {

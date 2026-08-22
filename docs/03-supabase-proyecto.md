@@ -53,12 +53,15 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 |---|---|---|
 | `0001_core.sql` | Tenant, sedes, usuarios, roles y permisos, configuración, series y correlativos, auditoría por trigger, funciones de contexto RLS | 8 |
 | `0002_operacion.sql` | Cliente/doctor/paciente, catálogo y tarifas, listas de precio con captura de IGV, colores, procesos y flujos, estados, orden de trabajo, detalle de venta, tareas de producción, archivos y entregas | 20 |
-| `0003_finanzas.sql` *(Fase 2)* | Documentos, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, cobranza, promesas, notificaciones, vistas de KPI, funciones transaccionales | 15 + 7 vistas |
-| `0004_calidad_inventario.sql` *(Fase 3)* | Control de calidad, retrabajos y garantías, inventario con lotes, compras y proveedores | por definir |
+| `0003_almacenamiento.sql` | Bucket privado `adjuntos` con políticas por tenant, evidencia de entrega, paneles del dashboard por usuario | 0 + 1 columna |
+| `0004_finanzas.sql` *(Fase 2)* | Documentos de venta, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, gestiones y promesas de cobranza, `v_cartera`, `v_deuda_cliente`, `v_pendiente_facturar`, funciones transaccionales | 12 + 3 vistas |
+| `0005_calidad_inventario.sql` *(Fase 3)* | Checklists e inspecciones, retrabajos y garantías, competencias, materiales con lotes y movimientos, inventario físico, costos externos, `v_stock`, `v_alerta_stock`, `v_costo_orden`, `v_rentabilidad_orden` | 14 + 4 vistas |
 
-**Aplicadas en Fase 0: `0001_core` y `0002_operacion` — 29 tablas, 55 políticas RLS, 15 funciones**, verificadas con `npm run db:test`.
+**Aplicadas: `0001_core`, `0002_operacion`, `0003_almacenamiento`, `0004_finanzas` y `0005_calidad_inventario`**, verificadas con `npm run db:test` — cinco suites, 64 comprobaciones.
 
-`0003_finanzas` entra en la Fase 2 y `0004_calidad_inventario` en la Fase 3: **las migraciones siguen las fases**. Escribir hoy un esquema que no se estrena hasta dentro de seis meses es escribir algo que va a cambiar antes de usarse.
+**Las migraciones siguen las fases**: escribir hoy un esquema que no se estrena hasta dentro de seis meses es escribir algo que va a cambiar antes de usarse. Compras y proveedores, que estaban previstos aquí, se mueven a la Fase 4 con su módulo.
+
+> La numeración se corrió una posición respecto del plan original: el Storage necesitaba su propia migración y ocupó el `0003`. Finanzas pasó a `0004` y calidad/inventario a `0005`.
 
 > **Ya no existe `0004_areas_y_roles.sql`.** Ese archivo era un parche sobre un anexo SQL que se daba por existente, y ese anexo nunca existió: las migraciones se escribieron desde cero en la Fase 0. Escribir `usuario.rol` en `0001` para reemplazarlo en `0004` habría sido escribir código que ya sabemos que está mal, así que **los roles N:M y `area_id` entran correctos desde `0001`**, y `lista_precio.precios_incluyen_igv` desde `0002`.
 >
@@ -74,10 +77,15 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 ```bash
 npm run db:start   # levanta Postgres, Auth, Storage y Studio en Docker
 npm run db:test    # reset + pruebas de RLS y auditoría
+npm run db:demo    # carga datos de demostración (después de un reset)
 npm run db:studio  # http://127.0.0.1:54323
 ```
 
 `supabase/tests/` ataca la base **directamente**, no a través de la interfaz: una regla que sólo se prueba desde el front no está probada. Hoy cubre aislamiento entre laboratorios, escalada de privilegios, unión de roles e inalterabilidad de la bitácora.
+
+`supabase/demo.sql` es aparte del seed **a propósito**: `db:test` aplica el seed, y una base de pruebas que ya trae clientes y facturas hace que las comprobaciones dejen de medir lo que dicen medir. La demo deja seis trabajos entregados, dos facturados, un cobro parcial y una caja cerrada con un descuadre de S/ 20 explicado — es decir, el ciclo del dinero completo y con el aging repartido en dos tramos. Es idempotente, así que se puede recargar cuando se llene de pruebas.
+
+> La demo reinicia los correlativos de serie, cosa que en producción sería inaceptable. Puede hacerlo porque borra antes los documentos que los consumieron.
 
 Las decisiones del documento DD‑01 están implementadas en el esquema, no sólo documentadas:
 
@@ -186,7 +194,9 @@ select cron.schedule('alertas-stock', '0 7 * * *',  $$ select generar_alertas_st
 select cron.schedule('alertas-entrega','0 7 * * *', $$ select generar_alertas_entrega() $$);
 ```
 
-> `recalcular_scores()`, `generar_alertas_stock()` y `generar_alertas_entrega()` se implementan en la migración `0005_jobs.sql` durante la Fase 2, con la fórmula de M‑02. *(Era `0004` antes de que ese número lo ocupara `0004_areas_y_roles.sql`.)*
+> Ninguno de estos jobs existe todavía. `marcar_cxc_vencidas()`, `evaluar_promesas_vencidas()` y `recalcular_scores()` entran en `0006_jobs.sql`, en el tramo de cobranza de la Fase 2 que sigue abierto; los dos de alertas esperan a la Fase 3. Las tablas `gestion_cobranza` y `promesa_pago` ya están creadas en `0004_finanzas` — lo que falta es la interfaz y el job que las mueve.
+>
+> El vencimiento **no** depende de este job: `v_cartera` calcula el tramo de mora comparando contra la fecha de hoy, así que la cartera envejece sola aunque el cron nunca llegue a correr. El job sólo materializaría el estado para poder consultarlo por índice.
 
 ---
 

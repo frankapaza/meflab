@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "docs/**",
     // El CLI de Supabase vendoriza aquí el runtime de edge functions.
     "supabase/.temp/**",
+    // Herramientas Node de una vez (generar el cuaderno del laboratorio).
+    // Son CommonJS y se ejecutan con `node`, no forman parte del bundle.
+    "scripts/*.cjs",
   ]),
 ]);
 
