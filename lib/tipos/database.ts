@@ -1427,6 +1427,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "flujo_etapa_proceso_id_fkey"
+            columns: ["proceso_id"]
+            isOneToOne: false
+            referencedRelation: "v_proceso_sin_cobertura"
+            referencedColumns: ["proceso_id"]
+          },
+          {
             foreignKeyName: "flujo_etapa_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2834,6 +2841,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proceso_competencia_proceso_id_fkey"
+            columns: ["proceso_id"]
+            isOneToOne: false
+            referencedRelation: "v_proceso_sin_cobertura"
+            referencedColumns: ["proceso_id"]
+          },
+          {
             foreignKeyName: "proceso_competencia_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3296,6 +3310,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tarea_produccion_proceso_id_fkey"
+            columns: ["proceso_id"]
+            isOneToOne: false
+            referencedRelation: "v_proceso_sin_cobertura"
+            referencedColumns: ["proceso_id"]
+          },
+          {
             foreignKeyName: "tarea_produccion_tecnico_id_fkey"
             columns: ["tecnico_id"]
             isOneToOne: false
@@ -3623,6 +3644,41 @@ export type Database = {
           },
         ]
       }
+      v_competencia_sin_acreditar: {
+        Row: {
+          codigo: string | null
+          competencia: string | null
+          competencia_id: string | null
+          declarada_en: string | null
+          nivel: number | null
+          tecnico: string | null
+          tenant_id: string | null
+          usuario_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tecnico_competencia_competencia_id_fkey"
+            columns: ["competencia_id"]
+            isOneToOne: false
+            referencedRelation: "competencia"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tecnico_competencia_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tecnico_competencia_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuario"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_costo_orden: {
         Row: {
           cliente_id: string | null
@@ -3772,6 +3828,26 @@ export type Database = {
           },
           {
             foreignKeyName: "orden_trabajo_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_proceso_sin_cobertura: {
+        Row: {
+          codigo: string | null
+          competencia: string | null
+          nivel_minimo: number | null
+          nombre: string | null
+          proceso_id: string | null
+          tecnicos_que_cubren: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proceso_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenant"
@@ -4022,6 +4098,20 @@ export type Database = {
       siguiente_correlativo: {
         Args: { p_serie: string; p_tenant: string; p_tipo_doc: string }
         Returns: number
+      }
+      sugerir_tecnico: {
+        Args: { p_proceso: string }
+        Returns: {
+          acreditada: boolean
+          cumple: boolean
+          horas_pendientes: number
+          motivo: string
+          nivel: number
+          nivel_minimo: number
+          nombre: string
+          tareas_activas: number
+          usuario_id: string
+        }[]
       }
       tasa_igv: { Args: { p_tenant: string }; Returns: number }
       tiene_rol: { Args: { roles: string[] }; Returns: boolean }

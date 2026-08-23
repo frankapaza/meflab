@@ -358,6 +358,59 @@ begin
 end
 $f3$;
 
+-- ── competencias (AC-01 §8) ───────────────────────────────────────────
+-- Se declaran unas pocas y se reparten desigual a propósito: así la
+-- pantalla enseña el caso interesante —un proceso que cubre una sola
+-- persona— en vez de una matriz uniforme que no dice nada.
+delete from public.competencia where tenant_id = 'a0000000-0000-4000-8000-000000000001';
+
+do $comp$
+declare
+  v_tenant constant uuid := 'a0000000-0000-4000-8000-000000000001';
+  v_area   uuid;
+  v_ceram  uuid;  v_cad uuid;  v_esq uuid;
+  v_tec    uuid;
+begin
+  select id into v_area from public.area where tenant_id = v_tenant and es_default;
+
+  insert into public.competencia (tenant_id, area_id, codigo, nombre)
+  values (v_tenant, v_area, 'CERAM', 'Cerámica estratificada') returning id into v_ceram;
+  insert into public.competencia (tenant_id, area_id, codigo, nombre)
+  values (v_tenant, v_area, 'CAD', 'Diseño CAD') returning id into v_cad;
+  insert into public.competencia (tenant_id, area_id, codigo, nombre)
+  values (v_tenant, v_area, 'ESQ', 'Esqueléticos') returning id into v_esq;
+
+  -- El técnico de la semilla tiene dos de las tres, y una sin acreditar.
+  select id into v_tec from public.usuario
+   where tenant_id = v_tenant and email = 'tecnico@labvera.pe';
+
+  if v_tec is not null then
+    insert into public.tecnico_competencia (
+      tenant_id, usuario_id, competencia_id, nivel, acreditada_por, acreditada_en)
+    values (v_tenant, v_tec, v_ceram, 3,
+            'a0000000-0000-4000-8000-000000000100', now());
+
+    -- Ésta la declaró él y nadie la respaldó: es la que AC-01 §8 pide
+    -- poder detectar.
+    insert into public.tecnico_competencia (tenant_id, usuario_id, competencia_id, nivel)
+    values (v_tenant, v_tec, v_cad, 2);
+  end if;
+
+  -- Los procesos de cerámica exigen la competencia; el resto no.
+  insert into public.proceso_competencia (tenant_id, proceso_id, competencia_id, nivel_minimo)
+  select v_tenant, p.id, v_ceram, 2
+    from public.proceso p
+   where p.tenant_id = v_tenant and p.codigo ilike '%CER%';
+
+  -- Y los esqueléticos exigen una que NO tiene nadie: aparece como
+  -- proceso sin cobertura, que es el aviso útil.
+  insert into public.proceso_competencia (tenant_id, proceso_id, competencia_id, nivel_minimo)
+  select v_tenant, p.id, v_esq, 2
+    from public.proceso p
+   where p.tenant_id = v_tenant and p.codigo ilike '%ESQ%';
+end
+$comp$;
+
 -- M-02: el score se calcula, no se teclea. En producción lo hace un job
 -- nocturno (0006_jobs); aquí se lanza a mano para que la demo lo enseñe.
 do $score$

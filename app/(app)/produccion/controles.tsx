@@ -8,7 +8,15 @@ import { asignarTarea, cambiarEstadoOrden, type Resultado } from "./acciones";
 
 const INICIAL: Resultado = { ok: false, mensaje: null };
 
-export type OpcionTecnico = { id: string; nombre: string; horas: number };
+export type OpcionTecnico = {
+  id: string;
+  nombre: string;
+  horas: number;
+  /** Nivel en la competencia que exige el proceso. 0 = no la tiene. */
+  nivel?: number;
+  /** Si llega el nivel mínimo. Sin exigencia declarada, indefinido. */
+  cumple?: boolean;
+};
 
 /**
  * Asignar una etapa a un técnico.
@@ -50,11 +58,26 @@ export function SelectorTecnico({
         className="h-[32px] w-full min-w-[170px] rounded-r1 border border-line bg-card-2 px-s2 text-sm outline-none focus-visible:border-acc disabled:opacity-60"
       >
         <option value="">Sin asignar</option>
-        {tecnicos.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.nombre} · {horasLegibles(t.horas)}
-          </option>
-        ))}
+        {/* A quien no llega al nivel exigido no se le esconde: se le marca
+            y se le baja. A veces hay que asignarle igual —hoy falta uno,
+            corre prisa— y conviene que se vea que es una excepción, no un
+            descuido. El orden con autoridad lo da sugerir_tecnico(). */}
+        {[...tecnicos]
+          .sort((a, b) => {
+            if (a.cumple !== b.cumple) return a.cumple ? -1 : 1;
+            return a.horas - b.horas;
+          })
+          .map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.cumple === false ? "▲ " : ""}
+              {t.nombre} · {horasLegibles(t.horas)}
+              {t.cumple === false
+                ? t.nivel
+                  ? ` · nivel ${t.nivel}, insuficiente`
+                  : " · sin la competencia"
+                : ""}
+            </option>
+          ))}
       </select>
       {estado.mensaje && !estado.ok ? (
         <span role="alert" className="text-xs text-err">

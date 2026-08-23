@@ -57,7 +57,7 @@ Para desarrollo local con Docker: `supabase start` levanta Postgres, Auth, Stora
 | `0004_finanzas.sql` *(Fase 2)* | Documentos de venta, cuentas por cobrar, pagos y aplicaciones, anticipos, caja y arqueo, gestiones y promesas de cobranza, `v_cartera`, `v_deuda_cliente`, `v_pendiente_facturar`, funciones transaccionales | 12 + 3 vistas |
 | `0005_calidad_inventario.sql` *(Fase 3)* | Checklists e inspecciones, retrabajos y garantías, competencias, materiales con lotes y movimientos, inventario físico, costos externos, `v_stock`, `v_alerta_stock`, `v_costo_orden`, `v_rentabilidad_orden` | 14 + 4 vistas |
 
-**Aplicadas: `0001_core`, `0002_operacion`, `0003_almacenamiento`, `0004_finanzas` y `0005_calidad_inventario`**, verificadas con `npm run db:test` — cinco suites, 64 comprobaciones.
+**Aplicadas: `0001_core`, `0002_operacion`, `0003_almacenamiento`, `0004_finanzas` y `0005_calidad_inventario`**, verificadas con `npm run db:test` — seis suites, 70 comprobaciones.
 
 **Las migraciones siguen las fases**: escribir hoy un esquema que no se estrena hasta dentro de seis meses es escribir algo que va a cambiar antes de usarse. Compras y proveedores, que estaban previstos aquí, se mueven a la Fase 4 con su módulo.
 

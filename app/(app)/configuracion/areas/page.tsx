@@ -4,6 +4,16 @@ import { redirect } from "next/navigation";
 import { contextoActual } from "@/lib/auth/permisos";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
+import {
+  Exigencias,
+  Matriz,
+  NuevaCompetencia,
+  type Competencia,
+  type Nivel,
+  type Proceso,
+  type Tecnico,
+} from "./matriz";
+
 export const metadata = { title: "Áreas y competencias · MEFLAB" };
 
 /**
@@ -22,11 +32,86 @@ export default async function AreasPage() {
 
   const supabase = await crearClienteServidor();
 
-  const [{ data: areas }, { count: servicios }, { count: procesos }] = await Promise.all([
+  const [
+    { data: areas },
+    { count: servicios },
+    { count: procesos },
+    { data: competencias },
+    { data: usuarios },
+    { data: niveles },
+    { data: listaProcesos },
+    { data: sinCobertura },
+  ] = await Promise.all([
     supabase.from("area").select("id, codigo, nombre, es_default, activo").order("codigo"),
     supabase.from("servicio").select("*", { count: "exact", head: true }),
     supabase.from("proceso").select("*", { count: "exact", head: true }),
+    supabase.from("competencia").select("id, codigo, nombre").eq("activo", true).order("nombre"),
+    supabase
+      .from("usuario")
+      .select("id, nombre, usuario_rol(rol)")
+      .eq("activo", true)
+      .order("nombre"),
+    supabase
+      .from("tecnico_competencia")
+      .select("usuario_id, competencia_id, nivel, acreditada_por"),
+    supabase
+      .from("proceso")
+      .select("id, codigo, nombre, proceso_competencia(competencia_id, nivel_minimo)")
+      .eq("activo", true)
+      .order("codigo"),
+    // El riesgo que nadie mira hasta que el único que sabe hacer algo se
+    // va de vacaciones.
+    supabase.from("v_proceso_sin_cobertura").select("*"),
   ]);
+
+  const listaCompetencias: Competencia[] = (competencias ?? []) as Competencia[];
+
+  const tecnicos: Tecnico[] = ((usuarios ?? []) as unknown as {
+    id: string;
+    nombre: string;
+    usuario_rol: { rol: string }[];
+  }[])
+    .filter((u) => u.usuario_rol.some((r) => r.rol === "tecnico"))
+    .map((u) => ({ id: u.id, nombre: u.nombre }));
+
+  const listaNiveles: Nivel[] = ((niveles ?? []) as unknown as {
+    usuario_id: string;
+    competencia_id: string;
+    nivel: number;
+    acreditada_por: string | null;
+  }[]).map((n) => ({
+    usuarioId: n.usuario_id,
+    competenciaId: n.competencia_id,
+    nivel: n.nivel,
+    acreditada: n.acreditada_por !== null,
+  }));
+
+  const procesosConExigencia: Proceso[] = ((listaProcesos ?? []) as unknown as {
+    id: string;
+    codigo: string;
+    nombre: string;
+    proceso_competencia: { competencia_id: string; nivel_minimo: number }[];
+  }[]).map((p) => ({
+    id: p.id,
+    codigo: p.codigo,
+    nombre: p.nombre,
+    competenciaId: p.proceso_competencia[0]?.competencia_id ?? null,
+    nivelMinimo: p.proceso_competencia[0]?.nivel_minimo ?? null,
+  }));
+
+  const riesgos = (sinCobertura ?? []) as unknown as {
+    proceso_id: string;
+    nombre: string;
+    competencia: string;
+    nivel_minimo: number;
+    tecnicos_que_cubren: number;
+  }[];
+
+  const puedeEditar = ctx.roles.some((r) =>
+    ["administrador", "lider_laboratorio"].includes(r),
+  );
+  const areaPorDefecto =
+    (areas ?? []).find((a) => a.es_default)?.id ?? (areas ?? [])[0]?.id ?? "";
 
   const lista = areas ?? [];
 
@@ -143,6 +228,79 @@ export default async function AreasPage() {
           ))}
         </ul>
       </div>
+
+      {/* ── competencias · AC-01 §8 ──────────────────────────────────── */}
+      <section className="flex flex-col gap-s3 rounded-r2 border border-line bg-card p-s4 shadow-e1">
+        <div className="flex flex-wrap items-center justify-between gap-s3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-2">
+            Competencias por técnico
+          </h2>
+          {puedeEditar ? <NuevaCompetencia areaId={areaPorDefecto} /> : null}
+        </div>
+        <p className="max-w-[760px] text-sm leading-relaxed text-ink-2">
+          Qué sabe hacer cada uno y a qué nivel. Es lo que permite sugerir a
+          quién asignar una etapa por{" "}
+          <b className="font-semibold text-ink">competencia y carga</b>, no
+          sólo por quién está libre.
+        </p>
+        <Matriz
+          competencias={listaCompetencias}
+          tecnicos={tecnicos}
+          niveles={listaNiveles}
+          puedeEditar={puedeEditar}
+        />
+      </section>
+
+      {/* El riesgo que sólo se ve cuando ya es tarde. */}
+      {riesgos.length > 0 ? (
+        <section className="flex flex-col gap-s2 rounded-r2 border border-warn bg-card p-s4 shadow-e1">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-warn">
+            <span aria-hidden="true">▲</span> Procesos que cubre una sola persona
+          </h2>
+          <p className="max-w-[760px] text-sm leading-relaxed text-ink-2">
+            El día que falte, ese proceso se para. Verlo hoy es la diferencia
+            entre planificarlo y descubrirlo un lunes por la mañana.
+          </p>
+          <ul className="flex flex-col">
+            {riesgos.map((r) => (
+              <li
+                key={r.proceso_id}
+                className="flex flex-wrap items-baseline gap-s3 border-b border-line py-s2 last:border-0"
+              >
+                <span className="min-w-[160px] flex-1 text-sm">{r.nombre}</span>
+                <span className="font-mono text-xs text-ink-3">
+                  exige {r.competencia} nivel {r.nivel_minimo}
+                </span>
+                <span
+                  className={
+                    r.tecnicos_que_cubren === 0
+                      ? "font-mono text-sm text-err"
+                      : "font-mono text-sm text-warn"
+                  }
+                >
+                  <span aria-hidden="true">▲</span>{" "}
+                  {r.tecnicos_que_cubren === 0 ? "nadie lo cubre" : "sólo 1 persona"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-s3 rounded-r2 border border-line bg-card p-s4 shadow-e1">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-2">
+          Qué exige cada proceso
+        </h2>
+        <p className="max-w-[760px] text-sm leading-relaxed text-ink-2">
+          Un proceso sin competencia exigida se lo puede quedar cualquiera:
+          la sugerencia pasa a ordenar sólo por carga.
+        </p>
+        <Exigencias
+          procesos={procesosConExigencia}
+          competencias={listaCompetencias}
+          puedeEditar={puedeEditar}
+        />
+      </section>
 
       <p className="max-w-[760px] text-sm text-ink-3">
         El detalle de la decisión está en{" "}

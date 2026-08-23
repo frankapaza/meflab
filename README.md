@@ -35,7 +35,7 @@ número acaban discrepando.
 | 0 · Cimientos | Esquema, RLS, auth, multi‑tenant | Terminada |
 | 1 · MVP | Órdenes, producción por etapas, entregas | Terminada |
 | 2 · Ciclo del dinero | Facturación, CxC, pagos, caja, cobranza | Terminada salvo integraciones |
-| 3 · Control y calidad | Calidad, retrabajos, inventario, costos, auditoría | 6 de 9 módulos |
+| 3 · Control y calidad | Calidad, retrabajos, inventario, costos, competencias, auditoría | 7 de 9 módulos |
 | 4 · Ecosistema | Portal del doctor, compras, BI, móvil | Sin empezar |
 
 Lo que falta y por qué está en [`docs/04-fases-y-mvp.md`](docs/04-fases-y-mvp.md).
@@ -66,7 +66,7 @@ desarrollo está en `supabase/seed.sql`.
 ## Verificar
 
 ```bash
-npm run db:test      # 5 suites SQL · 64 comprobaciones
+npm run db:test      # 6 suites SQL · 70 comprobaciones
 npm test             # 198 pruebas unitarias
 npx tsc --noEmit && npx eslint .
 ```

@@ -25,6 +25,7 @@ type Tarea = {
   orden_etapa: number;
   estado: string;
   tecnico_id: string | null;
+  proceso_id: string;
   horas_estimadas: number;
   proceso: { codigo: string; nombre: string } | null;
 };
@@ -64,7 +65,7 @@ export default async function ProduccionPage() {
       supabase
         .from("tarea_produccion")
         .select(
-          "id, orden_id, orden_etapa, estado, tecnico_id, horas_estimadas, proceso:proceso_id(codigo, nombre)",
+          "id, orden_id, orden_etapa, estado, tecnico_id, proceso_id, horas_estimadas, proceso:proceso_id(codigo, nombre)",
         )
         .order("orden_etapa"),
       supabase
@@ -96,6 +97,32 @@ export default async function ProduccionPage() {
     carga.set(t.tecnico_id, (carga.get(t.tecnico_id) ?? 0) + Number(t.horas_estimadas));
   }
 
+  // Competencias: qué exige cada proceso y qué tiene declarado cada uno.
+  // Se traen las dos tablas de una vez y se cruzan aquí; la ordenación
+  // con autoridad es sugerir_tecnico() en la base, que además explica el
+  // porqué. Esto sólo ANOTA el selector para que no haya que abrir otra
+  // pantalla antes de asignar.
+  const [{ data: exigencias }, { data: nivelesComp }] = await Promise.all([
+    supabase.from("proceso_competencia").select("proceso_id, competencia_id, nivel_minimo"),
+    supabase.from("tecnico_competencia").select("usuario_id, competencia_id, nivel"),
+  ]);
+
+  const exigePorProceso = new Map(
+    ((exigencias ?? []) as unknown as {
+      proceso_id: string;
+      competencia_id: string;
+      nivel_minimo: number;
+    }[]).map((e) => [e.proceso_id, e]),
+  );
+
+  const nivelDe = new Map(
+    ((nivelesComp ?? []) as unknown as {
+      usuario_id: string;
+      competencia_id: string;
+      nivel: number;
+    }[]).map((n) => [n.usuario_id + "|" + n.competencia_id, n.nivel]),
+  );
+
   const tecnicos: OpcionTecnico[] = (usuarios ?? [])
     .filter((u) =>
       ((u.usuario_rol ?? []) as unknown as { rol: string }[]).some((r) =>
@@ -103,6 +130,17 @@ export default async function ProduccionPage() {
       ),
     )
     .map((u) => ({ id: u.id, nombre: u.nombre, horas: carga.get(u.id) ?? 0 }));
+
+  // Marca a cada técnico según la competencia que pide ESTE proceso. Sin
+  // exigencia declarada todos cumplen, que es el caso hoy.
+  const anotar = (procesoId: string): OpcionTecnico[] => {
+    const e = exigePorProceso.get(procesoId);
+    if (!e) return tecnicos;
+    return tecnicos.map((t) => {
+      const nivel = nivelDe.get(t.id + "|" + e.competencia_id) ?? 0;
+      return { ...t, nivel, cumple: nivel >= e.nivel_minimo };
+    });
+  };
 
   const opcionesEstado: OpcionEstado[] = (estados ?? []).map((e) => ({
     id: e.id,
@@ -228,7 +266,7 @@ export default async function ProduccionPage() {
                           key={`${t.id}-${t.tecnico_id ?? "libre"}`}
                           tareaId={t.id}
                           tecnicoId={t.tecnico_id}
-                          tecnicos={tecnicos}
+                          tecnicos={anotar(t.proceso_id)}
                           bloqueado={
                             !puedeAsignar ||
                             t.estado === "en_curso" ||

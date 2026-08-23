@@ -163,15 +163,14 @@ Lo mínimo para que el laboratorio abandone el Excel y el cuaderno.
 
 ## Fase 3 · Control y calidad *(8 semanas)*
 
-**Seis de nueve módulos terminados.** Las migraciones `0005_calidad_inventario`
-y `0006_electronico_notificaciones` ponen 16 tablas, 4 vistas y 6 funciones,
-con RLS y 12 comprobaciones que pasan.
+**Siete de nueve módulos terminados.** Las migraciones `0005`, `0006` y `0007`
+ponen 16 tablas, 6 vistas y 7 funciones, con RLS y 18 comprobaciones que pasan.
 
 | | # | Módulo | Alcance | Estado |
 |---|---|---|---|---|
 | ✅ | 3.1 | **Control de calidad** | Checklist configurable por servicio, inspección con resultado, evidencia fotográfica, no conformidades con causa y responsable | Completo salvo la evidencia fotográfica, que necesita el selector de archivos |
 | ✅ | 3.2 | **Retrabajos y garantías** | Retrabajo ligado a la orden original, tipificación de causa, política de garantía, costo generado, KPI de retrabajo | Completo. El costo se suma del material consumido; no se teclea |
-| ◐ | 3.3 | **Competencias y asignación sugerida** | Matriz competencia × técnico con nivel 1‑3, algoritmo de sugerencia por competencia y carga, alerta de competencia sin respaldo | Esquema completo. **Faltan** el algoritmo de sugerencia y la pantalla |
+| ✅ | 3.3 | **Competencias y asignación sugerida** | Matriz competencia × técnico con nivel 1‑3, algoritmo de sugerencia por competencia y carga, alerta de competencia sin respaldo | Completo. `sugerir_tecnico()` combina competencia y carga y devuelve el porqué; sin competencias declaradas ordena sólo por carga y sigue sirviendo |
 | ✅ | 3.4 | **Inventario** | Materiales, lotes con vencimiento, ubicación, movimientos, consumo por trabajo, umbral bajo y crítico, inventario físico con ajuste aprobado, trazabilidad | Completo salvo la pantalla del inventario físico; la función `aprobar_inventario` ya existe y está probada |
 | ✅ | 3.5 | **Costos y rentabilidad** | Costo estimado vs real (materiales + mano de obra por etapa + procesos externos), margen y rentabilidad por trabajo, doctor, servicio y periodo | Completo salvo la comparación estimado vs real y el corte por periodo |
 | ◻ | 3.6 | **Reportes y KPIs** | Los 9 KPIs del SRS §26, reportes productivos, comerciales, financieros y de inventario, con exportación a Excel/PDF | Sin empezar. **Los 9 KPIs no están enumerados en este repositorio**: hay que recuperarlos del SRS antes de construirlos |
