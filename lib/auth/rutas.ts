@@ -68,6 +68,7 @@ const REGLAS: Record<string, readonly string[]> = {
 
   // Configuración — sólo Administrador escribe; Gerencia consulta
   "/configuracion": ["administrador", "gerencia"],
+  "/configuracion/laboratorio": ["administrador", "gerencia"],
   "/configuracion/listas": ["administrador", "gerencia"],
   // Producción la consulta también quien dirige el taller: es la receta
   // con la que se fabrica, no sólo un parámetro administrativo.

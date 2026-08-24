@@ -163,7 +163,7 @@ Lo mínimo para que el laboratorio abandone el Excel y el cuaderno.
 
 ## Fase 3 · Control y calidad *(8 semanas)*
 
-**Siete de nueve módulos terminados.** Las migraciones `0005`, `0006` y `0007`
+**Ocho de nueve módulos terminados.** Sólo queda 3.6, bloqueado porque los 9 KPIs del §26 no están en este repositorio. Las migraciones `0005`, `0006` y `0007`
 ponen 16 tablas, 6 vistas y 7 funciones, con RLS y 18 comprobaciones que pasan.
 
 | | # | Módulo | Alcance | Estado |
@@ -176,7 +176,7 @@ ponen 16 tablas, 6 vistas y 7 funciones, con RLS y 18 comprobaciones que pasan.
 | ◻ | 3.6 | **Reportes y KPIs** | Los 9 KPIs del SRS §26, reportes productivos, comerciales, financieros y de inventario, con exportación a Excel/PDF | Sin empezar. **Los 9 KPIs no están enumerados en este repositorio**: hay que recuperarlos del SRS antes de construirlos |
 | ◐ | 3.7 | **Notificaciones** | Motor de eventos con canales sistema/email/WhatsApp y preferencias por usuario | Motor, preferencias y canal `sistema` funcionando, con dos eventos que disparan solos desde la base (rechazo de calidad, stock crítico). **Falta** la bandeja en pantalla; email y WhatsApp dependen de 2.9 |
 | ✅ | 3.8 | **Auditoría** | Consulta de la bitácora con filtros por usuario, módulo, entidad y rango de fechas | Completo. Los filtros viajan en la URL, así que una consulta concreta se puede compartir |
-| ◻ | 3.9 | **Configuración** | Pantalla única para todos los catálogos y parámetros del laboratorio | Sin empezar. Hoy la configuración está repartida en cinco pantallas que funcionan |
+| ✅ | 3.9 | **Configuración** | Pantalla única para todos los catálogos y parámetros del laboratorio | Completo. Índice con la identidad del laboratorio y sus parámetros —que hasta ahora sólo se podían cambiar por SQL— y enlace al resto de catálogos, que conservan su pantalla |
 
 > **Dos decisiones abiertas siguen sin cerrarse** (límite semana 21) y afectan
 > a esta fase, aunque no la bloquean:

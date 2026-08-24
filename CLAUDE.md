@@ -24,11 +24,9 @@ crédito y débito, se gestiona la cobranza con agenda de promesas, y la cartera
 cuadra al céntimo en las cinco pantallas que la muestran. **H‑01 está cerrado
 y hay una prueba que falla si se reabre.** De la Fase 2 sólo queda 2.9
 (integraciones), bloqueada hasta que el laboratorio abra las cuentas de PSE,
-Resend y WhatsApp. De la **Fase 3** hay siete de nueve módulos terminados: inventario, control de
-calidad, retrabajos, costos y rentabilidad, competencias con asignación
-sugerida, auditoría, y el motor de notificaciones por canal sistema. Faltan
-los 9 KPIs (3.6, que **no están enumerados en este repositorio**) y la
-configuración unificada (3.9). Detalle en `docs/04-fases-y-mvp.md`.
+Resend y WhatsApp. De la **Fase 3** hay ocho de nueve módulos terminados. Sólo queda 3.6:
+los 9 KPIs del §26 **no están enumerados en este repositorio** y hay que
+recuperarlos del SRS antes de construirlos. Detalle en `docs/04-fases-y-mvp.md`.
 
 ---
 

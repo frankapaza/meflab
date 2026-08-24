@@ -25,6 +25,10 @@ insert into public.area (id, tenant_id, codigo, nombre, es_default, color) value
 insert into public.configuracion (tenant_id, clave, valor, descripcion) values
   ('a0000000-0000-4000-8000-000000000001', 'igv',
    '{"tasa": 0.18}', 'Tasa de IGV vigente'),
+  -- Sin esto la mano de obra vale cero y los margenes salen mas altos de lo
+  -- que son. No da error: da una cifra tranquilizadora y falsa, que es peor.
+  ('a0000000-0000-4000-8000-000000000001', 'costo_hora',
+   '{"soles": 18}', 'Costo de una hora de taller, para el costo real por orden'),
   ('a0000000-0000-4000-8000-000000000001', 'dias_credito_default',
    '{"dias": 30}', 'Días de crédito por defecto para un cliente nuevo'),
   ('a0000000-0000-4000-8000-000000000001', 'score_pesos',
